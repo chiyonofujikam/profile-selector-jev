@@ -1,0 +1,70 @@
+.env
+.env.*
+!.env-example
+.venv/
+
+docs/legacy/
+
+# Python bytecode, caches, and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# Python environments and local uv cache
+venv/
+env/
+ENV/
+.uv-cache/
+
+# Python checks and coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit.xml
+
+# React, Vite, and TypeScript
+node_modules/
+.vite/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
+coverage/
+playwright-report/
+test-results/
+
+# Local logs and process files
+*.log
+*.pid
+*.pid.lock
+
+# Local PostgreSQL bind-mount storage, if used instead of Docker named volumes
+/pgdata/
+/postgres-data/
+/.docker/postgres/
+
+# Editor and operating-system files
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Reviewed import files may contain private candidate information.
+/local-data/

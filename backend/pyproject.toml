@@ -1,0 +1,20 @@
+[project]
+name = "profile-selector-jev"
+version = "0.1.0"
+description = "Auditable engineering profile search with Jev"
+readme = "../README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "alembic>=1.16,<2",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.9,<3",
+  "sqlalchemy>=2.0.40,<3",
+  "typesafe-sdk==0.7.5",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3,<10"]
+

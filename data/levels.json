@@ -1,0 +1,25 @@
+{
+    "language-level": [
+      "A1",
+      "A2",
+      "B1",
+      "B2",
+      "C1",
+      "C2",
+      "native"
+  ],
+  "experience": [
+      "Experts",
+      "Seniors",
+      "Confirmed",
+      "Medium",
+      "Juniors"
+  ],
+  "tool-expertise": [
+      "basic",
+      "limited",
+      "intermediate",
+      "advanced",
+      "expert"
+  ]
+}

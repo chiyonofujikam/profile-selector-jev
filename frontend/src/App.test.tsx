@@ -1,0 +1,150 @@
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import App from './App'
+import type { Analysis, CatalogFilter, Constraint, ProfileMatch } from './api/types'
+
+// Deliberately isolated fixtures: these are never seeded into the application.
+const { apiMock, postMock } = vi.hoisted(() => ({ apiMock: vi.fn(), postMock: vi.fn() }))
+vi.mock('./api/client', () => ({ api: apiMock, post: postMock }))
+
+const fixtureFilter: CatalogFilter = {
+  id: 'fixture-skill', category_id: 'fixture-category', label: 'Fixture skill',
+  description: 'Isolated workflow test filter.', aliases: [],
+  levels: [{ id: 'fixture-level', label: 'Fixture level', rank: 1, dimension: 'tool-expertise' }],
+}
+const fixtureConstraint: Constraint = {
+  filter_id: fixtureFilter.id, mode: 'include', requirement: 'mandatory',
+  level_id: 'fixture-level', operator: 'exact', source: 'jev',
+}
+const fixtureMatch: ProfileMatch = {
+  profile: { id: 'fixture-profile', display_name: 'Isolated candidate fixture', title: 'Test fixture only',
+    summary: 'Not product demonstration data.', experience_years: null, competencies: [], languages: [] },
+  score: 100, matched: ['Fixture skill'], unmet: [], unknown: [], eligible: true,
+}
+
+function resultFor(body: { state_text: string; client_revision: number }, filters = [fixtureConstraint]): Analysis {
+  return {
+    id: 'fixture-analysis', state_text: body.state_text, client_revision: body.client_revision,
+    provider: 'jev', model: 'fixture-model', policy_version: 'fixture-policy', catalog_version: 'fixture-catalog',
+    status: 'completed', created_at: '2026-01-01T00:00:00Z', duration_ms: 4, filters,
+    decisions: [
+      { question_id: 'fixture-relevance', filter_id: fixtureFilter.id, filter_label: fixtureFilter.label,
+        question: 'Does the isolated fixture apply?', primitive: 'noul', kind: 'relevance', status: 'selected',
+        probability: 0.99, provenance: 'jev', threshold: 0.7 },
+      { question_id: 'fixture-level-question', filter_id: fixtureFilter.id, filter_label: fixtureFilter.label,
+        question: 'Which stated fixture level applies?', primitive: 'choice', kind: 'level', status: 'selected',
+        selected_value: 'fixture-level', confidence: 0.8,
+        probabilities: { 'fixture-level': 0.8, unspecified: 0.15, unsupported: 0.05 }, provenance: 'jev', threshold: 0.7 },
+      { question_id: 'fixture-exclusion', filter_id: fixtureFilter.id, filter_label: fixtureFilter.label,
+        question: 'Is the fixture explicitly excluded?', primitive: 'noul', kind: 'exclusion', status: 'rejected',
+        probability: 0.1, provenance: 'jev', threshold: 0.3 },
+    ],
+    provider_response: { answers: { 'fixture-level-question': { probabilities: { 'fixture-level': 0.8, unspecified: 0.15, unsupported: 0.05 } } } },
+    usage: { input_tokens: 10, output_tokens: 5 },
+  }
+}
+
+const analysisCalls = () => postMock.mock.calls.filter(([path]) => path === '/api/v1/analyses')
+
+beforeEach(() => {
+  apiMock.mockReset()
+  postMock.mockReset()
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === '/api/v1/config') return { provider: 'jev', model: 'fixture-model', supported_locales: ['en', 'fr', 'es'] }
+    if (path === '/health') return { status: 'ok', database: { ready: true }, provider: { ready: true } }
+    if (path === '/api/v1/categories') return [{ id: 'fixture-category', key: 'fixture', label: 'Fixture category', count: 1 }]
+    if (path.startsWith('/api/v1/filters?')) return { items: [fixtureFilter], total: 1, page: 1, page_size: 30 }
+    throw new Error(`Unexpected test API path: ${path}`)
+  })
+  postMock.mockImplementation(async (path: string, body: { filters?: Constraint[]; state_text: string; client_revision: number }) => {
+    if (path === '/api/v1/analyses') return resultFor(body)
+    if (path === '/api/v1/profiles/search') return {
+      items: body.filters?.length ? [fixtureMatch] : [], total: body.filters?.length ? 1 : 0, page: 1, page_size: 12,
+    }
+    throw new Error(`Unexpected test POST path: ${path}`)
+  })
+})
+
+afterEach(() => cleanup())
+
+describe('filter dashboard workflows', () => {
+  it('applies an analysis, refreshes candidates, and inspects all values without another provider call', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const checkbox = await screen.findByRole<HTMLInputElement>('checkbox', { name: /Fixture skill/ })
+    expect(checkbox.checked).toBe(false)
+    expect(screen.queryByRole('table')).toBeNull()
+    await user.type(screen.getByLabelText('State for Jev'), 'Isolated requirement fixture')
+    await user.click(screen.getByRole('button', { name: /Update filters with Jev/ }))
+    await waitFor(() => expect(checkbox.checked).toBe(true))
+    expect((screen.getByLabelText('Fixture skill level') as HTMLSelectElement).value).toBe('fixture-level')
+    await screen.findByText('Isolated candidate fixture')
+    expect(postMock.mock.calls.some(([path, body]) => path === '/api/v1/profiles/search' && body.filters?.[0]?.level_id === 'fixture-level')).toBe(true)
+    expect(analysisCalls()).toHaveLength(1)
+    expect(analysisCalls()[0][1]).toMatchObject({ state_text: 'Isolated requirement fixture', current_filters: [], locale: 'en' })
+
+    await user.click(screen.getByRole('button', { name: /Show response/ }))
+    expect(screen.getByRole('table')).toBeTruthy()
+    expect(screen.getByText('fixture-exclusion')).toBeTruthy()
+    expect(screen.getByText('10.0%')).toBeTruthy()
+    expect(screen.getByText('15.0%')).toBeTruthy()
+    expect(screen.getByText('5.0%')).toBeTruthy()
+    await user.click(screen.getByRole('tab', { name: 'Raw JSON' }))
+    expect(screen.getByRole('tabpanel').textContent).toContain('fixture-level-question')
+    await user.click(screen.getByRole('button', { name: /Hide response/ }))
+    expect(screen.queryByRole('tabpanel')).toBeNull()
+    await user.click(screen.getByRole('button', { name: /Show response/ }))
+    expect(screen.getByRole('tabpanel').textContent).toContain('fixture-level-question')
+    expect(analysisCalls()).toHaveLength(1)
+    expect(checkbox.checked).toBe(true)
+  })
+
+  it('preserves newer manual filter and level edits when a delayed analysis arrives', async () => {
+    let release!: (value: Analysis) => void
+    const pending = new Promise<Analysis>(resolve => { release = resolve })
+    const defaultPost = postMock.getMockImplementation()!
+    postMock.mockImplementation((path: string, body: unknown) => path === '/api/v1/analyses' ? pending : defaultPost(path, body))
+    const user = userEvent.setup()
+    render(<App />)
+    const checkbox = await screen.findByRole<HTMLInputElement>('checkbox', { name: /Fixture skill/ })
+    await user.type(screen.getByLabelText('State for Jev'), 'Pending isolated requirement')
+    await user.click(screen.getByRole('button', { name: /Update filters with Jev/ }))
+    expect(analysisCalls()).toHaveLength(1)
+    await user.click(checkbox)
+    await user.selectOptions(screen.getByLabelText('Fixture skill level'), 'fixture-level')
+    await user.selectOptions(screen.getByLabelText('Fixture skill inclusion'), 'exclude')
+    const body = analysisCalls()[0][1]
+    await act(async () => { release(resultFor(body, [])); await pending })
+    await screen.findByText(/Your newer edits were preserved/)
+    expect(checkbox.checked).toBe(true)
+    expect((screen.getByLabelText('Fixture skill inclusion') as HTMLSelectElement).value).toBe('exclude')
+    expect((screen.getByLabelText('Fixture skill level') as HTMLSelectElement).value).toBe('fixture-level')
+    expect(screen.getByText('Out of date')).toBeTruthy()
+    await waitFor(() => expect(postMock.mock.calls.some(([path, search]) => path === '/api/v1/profiles/search' && search.filters?.[0]?.mode === 'exclude')).toBe(true))
+  })
+
+  it('retains the requirement after failure and recovers through Retry', async () => {
+    const defaultPost = postMock.getMockImplementation()!
+    let failed = false
+    postMock.mockImplementation((path: string, body: unknown) => {
+      if (path === '/api/v1/analyses' && !failed) { failed = true; return Promise.reject(new Error('Provider request timed out. Please retry.')) }
+      return defaultPost(path, body)
+    })
+    const user = userEvent.setup()
+    render(<App />)
+    const checkbox = await screen.findByRole<HTMLInputElement>('checkbox', { name: /Fixture skill/ })
+    const input = screen.getByLabelText<HTMLTextAreaElement>('State for Jev')
+    await user.type(input, 'Recoverable isolated requirement')
+    await user.click(screen.getByRole('button', { name: /Update filters with Jev/ }))
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('Provider request timed out'))
+    expect(input.value).toBe('Recoverable isolated requirement')
+    expect(checkbox.checked).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(checkbox.checked).toBe(true))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(analysisCalls()).toHaveLength(2)
+    expect(analysisCalls()[1][1].request_id).toBe(analysisCalls()[0][1].request_id)
+    expect(input.value).toBe('Recoverable isolated requirement')
+  })
+})

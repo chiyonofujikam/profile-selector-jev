@@ -1,0 +1,213 @@
+{
+  "tool": [
+    {"name": "TestLink", "description": "Test management tool for planning, executing, and tracking software tests."},
+    {"name": "MATLAB", "description": "High-level language and environment for numerical computing, simulation, and algorithm development."},
+    {"name": "DOORS", "description": "Requirements management tool used for capturing, tracing, analyzing, and managing changes."},
+    {"name": "EN50129", "description": "European standard for safety-related electronic systems for signaling in railways."},
+    {"name": "Clearquest", "description": "Change management tool for tracking defects, enhancements, and tasks."},
+    {"name": "BIM", "description": "Building Information Modeling for digital representation of physical and functional characteristics of facilities."},
+    {"name": "Cycle en V", "description": "V-model for system and software development lifecycle, emphasizing verification and validation."},
+    {"name": "Agile", "description": "Iterative approach to project management and software development for delivering value faster."},
+    {"name": "Tetra", "description": "Terrestrial Trunked Radio, a professional mobile radio and two-way transceiver standard."},
+    {"name": "Cisco", "description": "Networking hardware, software, and telecommunications equipment company."},
+    {"name": "Hirschmann", "description": "Provider of industrial networking solutions, especially for automation and transportation."},
+    {"name": "PABX IPBX ", "description": "Private Automatic Branch Exchange, a private telephone network used within an organization."},
+    {"name": "Ps Next", "description": "Project management software for planning, scheduling, and resource management."},
+    {"name": "Primavera", "description": "Project portfolio management software for planning, managing, and executing projects."},
+    {"name": "PERT", "description": "Program Evaluation Review Technique, a project management tool for scheduling and organizing tasks."},
+    {"name": "capella", "description": "Model-based systems engineering tool for designing complex systems architectures."},
+    {"name": "Tilos", "description": "Time-location planning software for linear infrastructure projects."},
+    {"name": "SYSml", "description": "Systems Modeling Language for specifying, analyzing, designing, and verifying complex systems."},
+    {"name": "Python", "description": "Versatile, high-level programming language for automation, data analysis, AI, and software development."},
+    {"name": "Java", "description": "Object-oriented programming language used for building cross-platform applications."},
+    {"name": "C", "description": "General-purpose programming language for system and application software."},
+    {"name": "C++", "description": "Extension of C language with object-oriented features, used for high-performance applications."},
+    {"name": "VHDL", "description": "Hardware description language used in electronic design automation to describe digital circuits."},
+    {"name": "Assembleur", "description": "Low-level programming language for direct hardware manipulation and performance-critical code."},
+    {"name": "ADA", "description": "Structured, statically typed programming language, mainly used in safety-critical systems."},
+    {"name": "Shell", "description": "Command-line interpreter for scripting and automating tasks in Unix/Linux environments."},
+    {"name": "XML", "description": "Markup language for encoding documents in a format readable by humans and machines."},
+    {"name": "Arkitect", "description": "Software architecture analysis tool for PHP projects."},
+    {"name": "R", "description": "Programming language and environment for statistical computing and graphics."},
+    {"name": "Visual Basic", "description": "Event-driven programming language from Microsoft for building Windows applications."},
+    {"name": "Labview", "description": "System-design platform and development environment for visual programming from National Instruments."},
+    {"name": "UML", "description": "Unified Modeling Language for specifying, visualizing, and documenting software systems."},
+    {"name": "GIT", "description": "Distributed version control system for tracking changes in source code during software development."},
+    {"name": "Autocad", "description": "Computer-aided design (CAD) software for creating precise 2D and 3D drawings."},
+    {"name": "Rectify", "description": "Tool for correcting or adjusting data, images, or processes."},
+    {"name": "Bentley", "description": "Provider of software solutions for advancing infrastructure, including design and construction."},
+    {"name": "REVIT", "description": "BIM software for architects, structural engineers, and contractors."},
+    {"name": "LOI MOP", "description": "French law governing project management and public works contracting."},
+    {"name": "CANECO BT", "description": "Software for the design and calculation of low voltage electrical installations."},
+    {"name": "CANECO HT", "description": "Software for the design and calculation of high voltage electrical installations."},
+    {"name": "Dialux", "description": "Lighting design software for planning, calculation, and visualization of indoor and outdoor lighting."},
+    {"name": "Eurostag", "description": "Software for dynamic simulation of electrical power systems."},
+    {"name": "Convergence", "description": "Tool for process simulation and optimization in engineering projects."},
+    {"name": "See Electrical", "description": "CAD software for electrical engineering design and documentation."},
+    {"name": "BIM", "description": "Building Information Modeling for digital representation of physical and functional characteristics of facilities."},
+    {"name": "CREO", "description": "3D CAD software for product design and development."},
+    {"name": "Geremi", "description": "Project management software for construction and engineering projects."},
+    {"name": "Monte carlo", "description": "Statistical technique for modeling probability and risk in quantitative analysis."},
+    {"name": "RAM commander", "description": "Reliability, Availability, and Maintainability analysis software."},
+    {"name": "Item Toolkit", "description": "Tool for reliability, safety, and risk analysis in engineering."},
+    {"name": "EN50126", "description": "European standard for RAMS (Reliability, Availability, Maintainability, Safety) in railways."},
+    {"name": "EN50128", "description": "European standard for software in railway control and protection systems."},
+    {"name": "IEC 61508", "description": "International standard for functional safety of electrical/electronic systems."},
+    {"name": "AMDE", "description": "Failure Modes, Effects, and Criticality Analysis for risk assessment."},
+    {"name": "Méthode B", "description": "Formal method for software development, especially in safety-critical systems."},
+    {"name": "Scade", "description": "Model-based development environment for critical embedded software."},
+    {"name": "Prover", "description": "Formal verification tool for safety-critical systems, especially in railways."},
+    {"name": "Cenelec", "description": "European Committee for Electrotechnical Standardization, sets railway safety standards."},
+    {"name": "Testability Safety -SIL4", "description": "Highest safety integrity level for railway signaling systems."},
+    {"name": "CEM (Comptabilité électromagnétique)", "description": "Electromagnetic compatibility analysis for electronic systems."},
+    {"name": "FMEA - FMECA", "description": "Failure Modes and Effects Analysis / Failure Modes, Effects, and Criticality Analysis."},
+    {"name": "AMDEC", "description": "French acronym for FMEA, used for risk analysis in engineering."},
+    {"name": "Analyse fonctionnelle", "description": "Functional analysis for understanding and modeling system functions."},
+    {"name": "APR Analyse Préliminaire des Risques", "description": "Preliminary risk analysis for identifying hazards early in projects."},
+    {"name": "GAME", "description": "Tool or methodology for project management or risk analysis."},
+    {"name": "OSMOSE", "description": "Collaborative platform or methodology for engineering projects."},
+    {"name": "TIGRE", "description": "Tool or methodology for project management or engineering analysis."},
+    {"name": "CATIA", "description": "3D CAD software suite for product design and engineering."},
+    {"name": "CONTROLBUILD", "description": "Software for modeling, simulation, and testing of control systems."},
+    {"name": "Simulateur ERSA", "description": "Simulator for railway signaling and safety systems."},
+    {"name": "SIMULINK", "description": "Graphical programming environment for modeling, simulating, and analyzing dynamic systems."},
+    {"name": "SCADE", "description": "Model-based development environment for safety-critical embedded software."},
+    {"name": "Solidworks", "description": "3D CAD software for mechanical design and engineering."},
+    {"name": "Commutateurs Ethernet", "description": "Ethernet switches for network connectivity in industrial and transportation systems."},
+    {"name": "Routeurs et IAD", "description": "Routers and Integrated Access Devices for network communication."},
+    {"name": "DSLAM", "description": "Digital Subscriber Line Access Multiplexer for broadband internet access."},
+    {"name": "PABX IPBX", "description": "Private Automatic Branch Exchange, a private telephone network used within an organization."},
+    {"name": "Sonorisation", "description": "Public address and sound reinforcement systems."},
+    {"name": "Interphonie", "description": "Intercom systems for communication within buildings or vehicles."},
+    {"name": "Ethernet 802.3", "description": "Standard for Ethernet networking technology."},
+    {"name": "Radio 802.11", "description": "Standard for wireless local area networking (Wi-Fi)."},
+    {"name": "Normes 802.1", "description": "IEEE standards for network management and protocols."},
+    {"name": "LEA", "description": "Learning Environment Analysis or related tool/methodology."},
+    {"name": "Visio", "description": "Diagramming and vector graphics application from Microsoft."},
+    {"name": "N50129", "description": "Standard for safety-related electronic systems in railway signaling."},
+    {"name": "N50126", "description": "Standard for RAMS in railway applications."},
+    {"name": "N50127", "description": "Standard for railway signaling systems and equipment."},
+    {"name": "N50121", "description": "Standard for electromagnetic compatibility in railway applications."}
+  ],
+  "environnement-domain": [
+    {"name": "Energy", "description": "Projects and expertise related to power generation, transmission, and distribution, including renewable and conventional energy sources."},
+    {"name": "Railway", "description": "All aspects of railway systems, including infrastructure, signaling, rolling stock, and operations."}
+  ],
+  "environnement-context": {
+    "Energy": [
+      {"name": "Renewable Energie", "description": "Energy generated from renewable sources such as wind, solar, and hydroelectric power."},
+      {"name": "Thermal", "description": "Energy produced from heat sources, including fossil fuels and geothermal."},
+      {"name": "Oil & Gas", "description": "Sector involving exploration, extraction, refining, and distribution of oil and gas."},
+      {"name": "Nucléaire", "description": "Nuclear energy production and related technologies."}
+    ],
+    "Railway": [
+      {"name": "High Speed Lines", "description": "Railway lines designed for high-speed train operations, typically above 250 km/h."},
+      {"name": "Main Lines", "description": "Primary railway lines for long-distance and intercity travel."},
+      {"name": "Metro", "description": "Urban rapid transit systems for high-capacity public transport."},
+      {"name": "Tramway", "description": "Light rail systems operating mainly on city streets."},
+      {"name": "Tram-Train", "description": "Hybrid rail systems operating on both tram and train networks."}
+    ]
+  },
+
+  "domain-competence": {
+    "Energy": [
+      {"name": "Infrastructure", "description": "Physical and organizational structures needed for energy production and distribution."},
+      {"name": "Low Voltage", "description": "Electrical systems and components operating at low voltage levels."},
+      {"name": "monitoring & control and instrumentation", "description": "Systems for monitoring, controlling, and measuring energy processes."},
+      {"name": "Transmission And Distribution", "description": "Movement of electricity from generation sites to end users."},
+      {"name": "Equipment and facilities", "description": "Machinery and installations used in energy production and management."},
+      {"name": "Fluid Mechanics", "description": "Study and application of fluid behavior in energy systems."}
+    ],
+    "Railway": [
+      {"name": "Signalling", "description": "Systems and technologies for controlling railway traffic and ensuring safety."},
+      {"name": "Plant (OTM/OTP)", "description": "On Track Machines and On Track Plant for railway maintenance and construction."},
+      {"name": "Rolling Stock", "description": "Rail vehicles including locomotives, passenger, and freight cars."},
+      {"name": "Infrastructure", "description": "Physical structures such as tracks, bridges, and stations in railway systems."},
+      {"name": "High Voltage", "description": "Railway systems and components operating at high voltage levels."},
+      {"name": "Low Voltage", "description": "Railway systems and components operating at low voltage levels."}
+    ]
+  },
+  "domain-speciality": {
+    "Signalling": [
+      {"name": "ERTMS", "description": "European Rail Traffic Management System for standardizing train control and command."},
+      {"name": "CBTC", "description": "Communications-Based Train Control for automated railway signaling."},
+      {"name": "Interlocking (IXL)", "description": "System that prevents conflicting train movements through an arrangement of tracks."},
+      {"name": "National Systems", "description": "Country-specific railway signaling and control systems."},
+      {"name": "Train detection", "description": "Technologies for detecting the presence and location of trains on tracks."},
+      {"name": "Operations and Traffic Management", "description": "Managing train operations and traffic flow on railway networks."},
+      {"name": "Other", "description": "Other specialties related to railway signaling."}
+    ],
+    "Plant (OTM/OTP)": [
+      {"name": "OTM (On Track Machines)", "description": "Specialized machines for railway track maintenance and construction."},
+      {"name": "OTP (On Track Plant)", "description": "Equipment and vehicles used for railway track work and support."}
+    ],
+    "Rolling Stock": [
+      {"name": "Bogies and Wheelsets", "description": "Assemblies that support and guide rail vehicles on tracks."},
+      {"name": "Driving Cabs", "description": "Control compartments for train operators."},
+      {"name": "Electrical Systems", "description": "Electrical components and systems in rail vehicles."},
+      {"name": "Mechanical Systems", "description": "Mechanical parts and assemblies in rail vehicles."},
+      {"name": "Traction Systems", "description": "Systems providing propulsion for rail vehicles."},
+      {"name": "Train Safety Systems", "description": "Technologies ensuring the safety of trains and passengers."},
+      {"name": "Vehicle Interiors and Facilities", "description": "Interior features and amenities in rail vehicles."},
+      {"name": "Wagon", "description": "Freight railcars and their components."},
+      {"name": "Aerodynamics", "description": "Study of air flow and its effects on rail vehicles."},
+      {"name": "Braking Systems", "description": "Systems for slowing and stopping rail vehicles."},
+      {"name": "Gauging", "description": "Measurement and assessment of rail vehicle and track dimensions."},
+      {"name": "Human Factors", "description": "Consideration of human capabilities and limitations in rail vehicle design."},
+      {"name": "HVAC, Environment, Air Quality", "description": "Heating, ventilation, air conditioning, and air quality systems in rail vehicles."},
+      {"name": "Mass Management", "description": "Control and distribution of mass in rail vehicles."},
+      {"name": "Noise and Vibration", "description": "Analysis and mitigation of noise and vibration in rail systems."},
+      {"name": "Structural", "description": "Structural design and integrity of rail vehicles."},
+      {"name": "Vehicle Dynamics", "description": "Study of forces and motion in rail vehicles."},
+      {"name": "Fire & Materials", "description": "Fire safety and material selection in rail vehicles."},
+      {"name": "Train Automation", "description": "Automation technologies for train operation."},
+      {"name": "Embedded systems", "description": "Computer systems embedded in rail vehicles for control and monitoring."}
+    ],
+    "Infrastructure": [
+      {"name": "Geotechnology", "description": "Application of geological science to engineering works in railways."},
+      {"name": "Hydraulics", "description": "Fluid mechanics as applied to railway infrastructure."},
+      {"name": "Railroad", "description": "Track and related infrastructure for rail transport."},
+      {"name": "Level Crossings", "description": "Intersections where a railway line crosses a road or path at the same level."},
+      {"name": "Fixed Installations / Civil Engineering", "description": "Permanent structures and civil works in railway systems."},
+      {"name": "Arrangement", "description": "Layout and organization of railway infrastructure."},
+      {"name": "Fire & Materials", "description": "Fire safety and material selection in infrastructure."}
+    ],
+    "High Voltage": [
+      {"name": "Catenary", "description": "Overhead wire system supplying electricity to trains."},
+      {"name": "Captation", "description": "Collection of electrical power from overhead lines or third rails."},
+      {"name": "Electrical power line", "description": "High voltage lines for power transmission in railways."}
+    ],
+    "Low Voltage": [
+      {"name": "Radio / Wireless", "description": "Wireless communication systems in railway applications."},
+      {"name": "Wired Transmissions", "description": "Wired communication systems in railway applications."},
+      {"name": "Operational support systems", "description": "Systems supporting railway operations and management."},
+      {"name": "Instrumentation", "description": "Measurement and control devices in railway systems."},
+      {"name": "Building Management System (BMS) / Centralised Technical Management system (CTMS)", "description": "Systems for managing building and technical infrastructure in railways."}
+    ],
+    "monitoring & control and instrumentation": [
+      {"name": "SNCC / Automatisme", "description": "Supervisory control and automation systems in energy and railways."},
+      {"name": "Instrumentation", "description": "Devices and systems for measurement and control."}
+    ],
+    "Transmission And Distribution": [
+      {"name": "Low Voltage (LV) & High Voltage (HV) Distribution", "description": "Distribution of electrical power at various voltage levels."},
+      {"name": "Medium Voltage (MV)", "description": "Distribution of electrical power at medium voltage levels."},
+      {"name": "Electrical Protection", "description": "Systems for protecting electrical networks from faults."},
+      {"name": "Digital Control Systems (DCS)", "description": "Automated control systems for managing electrical processes."},
+      {"name": "Smart Grid", "description": "Modernized electrical grid with digital communication and automation."},
+      {"name": "Conversion", "description": "Processes and systems for converting electrical energy forms."}
+    ],
+    "Equipment and facilities": [
+      {"name": "Special Machines / Hoisting / Handling", "description": "Specialized equipment for lifting and handling in energy and railways."},
+      {"name": "Valve", "description": "Mechanical devices for controlling fluid flow."},
+      {"name": "Rotating Machines", "description": "Machines with rotating parts, such as turbines and generators."},
+      {"name": "Piping", "description": "Systems of pipes for transporting fluids."},
+      {"name": "Pressure Equipment", "description": "Equipment designed to operate under pressure."},
+      {"name": "Electro-mechanical Equipment", "description": "Equipment combining electrical and mechanical processes."}
+    ],
+    "Fluid Mechanics": [
+      {"name": "Electromagnetism", "description": "Study of electromagnetic forces in fluid systems."},
+      {"name": "Thermal Dissipation", "description": "Heat transfer and dissipation in fluid systems."},
+      {"name": "Fluid Dynamics", "description": "Behavior of fluids in motion."}
+    ]
+  }
+}
