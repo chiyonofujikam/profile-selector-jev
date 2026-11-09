@@ -1,3 +1,47 @@
+@echo off
+setlocal
+title Jev Profile Selector
+set "PROFILE_RUN_FILE=%~f0"
+
+if /i "%~1"=="--help" goto help
+if "%~1"=="/?" goto help
+
+echo.
+echo Jev Profile Selector
+echo ====================
+echo Start Docker Desktop before continuing.
+echo Dependencies and the database will be prepared automatically.
+echo Keep this window open while using the app. Press Ctrl+C to stop.
+echo.
+
+rem Run the PowerShell startup section stored in this same file.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$code = (Get-Content -LiteralPath $env:PROFILE_RUN_FILE -Raw) -split '(?m)^:powershell\r?$', 2; & ([scriptblock]::Create($code[1]))" %*
+set "launchExitCode=%errorlevel%"
+
+if not "%launchExitCode%"=="0" (
+    echo.
+    echo The app could not start. Check the error above.
+    echo Required: Python 3.13, uv, Node.js, and a running Docker Desktop.
+    echo.
+    pause
+)
+exit /b %launchExitCode%
+
+:help
+echo Usage: run.bat [options]
+echo.
+echo Double-click run.bat to prepare and start the app.
+echo Default app URL: http://127.0.0.1:5173
+echo.
+echo Options:
+echo   -Demo                  Load the supplied filters and fictional profiles
+echo   -SetupOnly             Prepare dependencies and database only
+echo   -BackendPort 8000      Choose the backend port
+echo   -FrontendPort 5173     Choose the frontend port
+echo   --help                 Show this help
+exit /b 0
+
+:powershell
 [CmdletBinding()]
 param(
     [switch]$SetupOnly,
@@ -7,7 +51,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$projectRoot = $PSScriptRoot
+$projectRoot = Split-Path -Parent $env:PROFILE_RUN_FILE
 $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
 $uvExecutable = if ($uvCommand) { $uvCommand.Source } else { $null }
 

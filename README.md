@@ -7,7 +7,7 @@ Type the skills you need, review the selected filters, and see matching profiles
 Install Python 3.13, uv, Node.js, and Docker Desktop. Start Docker Desktop, then run:
 
 ```powershell
-.\run.cmd
+.\run.bat
 ```
 
 The launcher prepares the database and starts the app. It asks for a database password if needed.
@@ -17,7 +17,7 @@ Open [localhost:5173](http://127.0.0.1:5173). Keep the launcher window open. Pre
 ## Try sample profiles
 
 ```powershell
-.\run.cmd -Demo
+.\run.bat -Demo
 ```
 
 This loads 12 fictional profiles and the supplied filters. Try `Railway and DOORS`.
@@ -74,3 +74,7 @@ npm --prefix frontend run test:browser
 ```
 
 For other setup options, see [development](docs/DEVELOPMENT.md). To load your own profiles, see [the data guide](docs/IMPLEMENTATION.md).
+
+## Clear caches
+
+Run `.\cleanup.bat` to delete project caches, frontend build and test output, and uv's shared cache. Close the app first. Dependencies, `.env`, and project data are kept. Use `.\cleanup.bat -WhatIf` to preview the cleanup.

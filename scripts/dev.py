@@ -1,4 +1,4 @@
-"""Local stack launcher. On Windows use run.cmd or run.ps1 from any directory."""
+"""Local stack launcher. On Windows use run.bat from any directory."""
 
 from __future__ import annotations
 
@@ -168,7 +168,7 @@ def run_services(root: Path, npm: str, environment: dict[str, str], backend_port
                     raise RuntimeError(
                         f"The backend on port {backend_port} is running with different Jev settings. "
                         f"Expected provider={provider}, model={model}. "
-                        "Press Ctrl+C in the original launcher window, then run run.cmd again."
+                        "Press Ctrl+C in the original launcher window, then run run.bat again."
                     )
                 raise RuntimeError(f"Port {backend_port} is occupied by a service that is not a ready Jev backend. Stop it, or use -BackendPort with another port.")
             service = start_service("backend", [sys.executable, "-m", "uvicorn", "backend.app.main:app", "--reload", "--host", "127.0.0.1", "--port", str(backend_port)], cwd=root, env=environment)
