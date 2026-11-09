@@ -72,12 +72,16 @@ def http_json(url: str) -> dict | None:
         return None
 
 
-def backend_ready(port: int) -> bool:
+def backend_ready(port: int, *, provider: str | None = None, model: str | None = None) -> bool:
     health = http_json(f"http://127.0.0.1:{port}/health")
     if not health or not health.get("database", {}).get("ready"):
         return False
     config = http_json(f"http://127.0.0.1:{port}/api/v1/config")
-    return bool(config and config.get("provider") in {"mock", "jev"} and "policy_version" in config)
+    if not config or config.get("provider") not in {"mock", "jev"} or "policy_version" not in config:
+        return False
+    if provider is not None and config["provider"] != provider:
+        return False
+    return provider != "jev" or model is None or config.get("model") == model
 
 
 def frontend_ready(port: int) -> bool:
@@ -152,16 +156,25 @@ def wait_ready(service: Service, check, *, timeout: float = 45) -> None:
 
 
 def run_services(root: Path, npm: str, environment: dict[str, str], backend_port: int, frontend_port: int) -> int:
+    values = {**dotenv_values(root / ".env"), **environment}
+    provider = values.get("DECISION_PROVIDER") or "mock"
+    model = values.get("JEV_MODEL") or "jev-latest"
     owned: list[Service] = []
     try:
-        if backend_ready(backend_port):
+        if backend_ready(backend_port, provider=provider, model=model):
             print(f"Backend already running on port {backend_port}; reusing it.", flush=True)
         else:
             if not port_available(backend_port):
+                if backend_ready(backend_port):
+                    raise RuntimeError(
+                        f"The backend on port {backend_port} is running with different Jev settings. "
+                        f"Expected provider={provider}, model={model}. "
+                        "Press Ctrl+C in the original launcher window, then run run.cmd again."
+                    )
                 raise RuntimeError(f"Port {backend_port} is occupied by a service that is not a ready Jev backend. Stop it, or use -BackendPort with another port.")
             service = start_service("backend", [sys.executable, "-m", "uvicorn", "backend.app.main:app", "--reload", "--host", "127.0.0.1", "--port", str(backend_port)], cwd=root, env=environment)
             owned.append(service)
-            wait_ready(service, lambda: backend_ready(backend_port))
+            wait_ready(service, lambda: backend_ready(backend_port, provider=provider, model=model))
 
         if frontend_ready(frontend_port):
             print(f"Frontend already running on port {frontend_port}; reusing it.", flush=True)
@@ -192,6 +205,7 @@ def run_services(root: Path, npm: str, environment: dict[str, str], backend_port
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--setup-only", action="store_true")
+    parser.add_argument("--demo", action="store_true", help="Load the supplied catalog and fictional demo profiles.")
     parser.add_argument("--backend-port", type=int, default=8000)
     parser.add_argument("--frontend-port", type=int, default=5173)
     args = parser.parse_args(argv)
@@ -206,12 +220,18 @@ def main(argv: list[str] | None = None) -> int:
         ensure_environment_file(ROOT)
         print("Starting PostgreSQL and preparing your configured database...", flush=True)
         database = provision_database(ROOT)
-        environment = {**os.environ, **database.environment}
+        # A terminal can retain old values after .env is edited. Local startup
+        # explicitly applies the project's file to every child process.
+        file_values = {key: value for key, value in dotenv_values(ROOT / ".env").items() if value is not None}
+        environment = {**os.environ, **file_values, **database.environment}
         allowed = (dotenv_values(ROOT / ".env").get("ALLOWED_ORIGINS") or "").split(",")
         environment["ALLOWED_ORIGINS"] = ",".join(dict.fromkeys([value.strip() for value in allowed if value.strip()] + [f"http://127.0.0.1:{args.frontend_port}", f"http://localhost:{args.frontend_port}"]))
         environment["VITE_API_URL"] = f"http://127.0.0.1:{args.backend_port}"
         print("Applying database migrations...", flush=True)
         run_checked([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=ROOT, env=environment)
+        if args.demo:
+            print("Loading the supplied catalog and fictional demo profiles...", flush=True)
+            run_checked([sys.executable, "-m", "scripts.seed_demo"], cwd=ROOT, env=environment)
         ensure_frontend_dependencies(ROOT, npm)
         if args.setup_only:
             print("Setup complete. Database and dependencies are ready.", flush=True)

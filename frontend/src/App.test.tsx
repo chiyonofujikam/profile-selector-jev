@@ -75,8 +75,8 @@ describe('filter dashboard workflows', () => {
     const checkbox = await screen.findByRole<HTMLInputElement>('checkbox', { name: /Fixture skill/ })
     expect(checkbox.checked).toBe(false)
     expect(screen.queryByRole('table')).toBeNull()
-    await user.type(screen.getByLabelText('State for Jev'), 'Isolated requirement fixture')
-    await user.click(screen.getByRole('button', { name: /Update filters with Jev/ }))
+    await user.type(screen.getByLabelText('State'), 'Isolated requirement fixture')
+    await user.click(screen.getByRole('button', { name: /Update filters/ }))
     await waitFor(() => expect(checkbox.checked).toBe(true))
     expect((screen.getByLabelText('Fixture skill level') as HTMLSelectElement).value).toBe('fixture-level')
     await screen.findByText('Isolated candidate fixture')
@@ -108,8 +108,8 @@ describe('filter dashboard workflows', () => {
     const user = userEvent.setup()
     render(<App />)
     const checkbox = await screen.findByRole<HTMLInputElement>('checkbox', { name: /Fixture skill/ })
-    await user.type(screen.getByLabelText('State for Jev'), 'Pending isolated requirement')
-    await user.click(screen.getByRole('button', { name: /Update filters with Jev/ }))
+    await user.type(screen.getByLabelText('State'), 'Pending isolated requirement')
+    await user.click(screen.getByRole('button', { name: /Update filters/ }))
     expect(analysisCalls()).toHaveLength(1)
     await user.click(checkbox)
     await user.selectOptions(screen.getByLabelText('Fixture skill level'), 'fixture-level')
@@ -134,9 +134,9 @@ describe('filter dashboard workflows', () => {
     const user = userEvent.setup()
     render(<App />)
     const checkbox = await screen.findByRole<HTMLInputElement>('checkbox', { name: /Fixture skill/ })
-    const input = screen.getByLabelText<HTMLTextAreaElement>('State for Jev')
+    const input = screen.getByLabelText<HTMLTextAreaElement>('State')
     await user.type(input, 'Recoverable isolated requirement')
-    await user.click(screen.getByRole('button', { name: /Update filters with Jev/ }))
+    await user.click(screen.getByRole('button', { name: /Update filters/ }))
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('Provider request timed out'))
     expect(input.value).toBe('Recoverable isolated requirement')
     expect(checkbox.checked).toBe(false)
@@ -146,5 +146,57 @@ describe('filter dashboard workflows', () => {
     expect(analysisCalls()).toHaveLength(2)
     expect(analysisCalls()[1][1].request_id).toBe(analysisCalls()[0][1].request_id)
     expect(input.value).toBe('Recoverable isolated requirement')
+  })
+
+  it('ignores an in-flight analysis after starting a new search', async () => {
+    let release!: (value: Analysis) => void
+    const pending = new Promise<Analysis>(resolve => { release = resolve })
+    const defaultPost = postMock.getMockImplementation()!
+    postMock.mockImplementation((path: string, body: unknown) =>
+      path === '/api/v1/analyses' ? pending : defaultPost(path, body))
+    const user = userEvent.setup()
+    render(<App />)
+    const checkbox = await screen.findByRole<HTMLInputElement>('checkbox', { name: /Fixture skill/ })
+    await user.type(screen.getByLabelText('State'), 'Old requirement')
+    await user.click(screen.getByRole('button', { name: /Update filters/ }))
+    const body = analysisCalls()[0][1]
+    await user.click(screen.getByRole('button', { name: 'New search' }))
+    await act(async () => { release(resultFor(body)); await pending })
+    expect(screen.getByLabelText<HTMLTextAreaElement>('State').value).toBe('')
+    expect(checkbox.checked).toBe(false)
+    expect(screen.queryByText('Filters updated.')).toBeNull()
+  })
+
+  it('remembers unavailable selected IDs instead of repeatedly fetching them', async () => {
+    const defaultApi = apiMock.getMockImplementation()!
+    apiMock.mockImplementation((path: string) => path.includes('ids=')
+      ? Promise.resolve({ items: [], total: 0, page: 1, page_size: 100 }) : defaultApi(path))
+    const defaultPost = postMock.getMockImplementation()!
+    postMock.mockImplementation((path: string, body: Parameters<typeof resultFor>[0]) => path === '/api/v1/analyses'
+      ? Promise.resolve(resultFor(body, [{ ...fixtureConstraint, filter_id: 'unavailable-filter' }])) : defaultPost(path, body))
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('checkbox', { name: /Fixture skill/ })
+    await user.type(screen.getByLabelText('State'), 'A changed catalog')
+    await user.click(screen.getByRole('button', { name: /Update filters/ }))
+    await screen.findByText(/Some selected filters are no longer available/)
+    await user.type(screen.getByLabelText('Search catalog filters'), 'another search')
+    await waitFor(() => expect(apiMock.mock.calls.some(([path]) => path.includes('q=another+search'))).toBe(true))
+    expect(apiMock.mock.calls.filter(([path]) => path.includes('ids='))).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Remove unavailable-filter' }))
+    expect(screen.queryByText(/Some selected filters are no longer available/)).toBeNull()
+  })
+
+  it('returns candidate pagination to page one after a filter edit', async () => {
+    const defaultPost = postMock.getMockImplementation()!
+    postMock.mockImplementation((path: string, body: { page: number }) => path === '/api/v1/profiles/search'
+      ? Promise.resolve({ items: [fixtureMatch], total: 24, page: body.page, page_size: 12 }) : defaultPost(path, body))
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Next page' }))
+    const searches = () => postMock.mock.calls.filter(([path]) => path === '/api/v1/profiles/search')
+    await waitFor(() => expect(searches().at(-1)?.[1].page).toBe(2))
+    await user.click(screen.getByRole('checkbox', { name: /Fixture skill/ }))
+    await waitFor(() => expect(searches().at(-1)?.[1]).toMatchObject({ page: 1, filters: [{ filter_id: fixtureFilter.id }] }))
   })
 })

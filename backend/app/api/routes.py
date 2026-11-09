@@ -1,71 +1,26 @@
-import hashlib
-import json
-import logging
-from datetime import datetime, timezone
-from time import perf_counter
-from uuid import uuid4
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_settings
 from backend.app.db import models as db
 from backend.app.db.session import get_db
+from backend.app.db.catalog import catalog, serialize_filter, serialize_profile
+from backend.app.services import analysis as analysis_service
+from backend.app.services.decisions import POLICY_VERSION
+from backend.app.services.matching import validate_constraints
 from backend.app.schemas import (
-    AnalysisRequest, AnalysisResponse, CatalogFilter, Category, ExampleResponse,
+    AnalysisRequest, AnalysisResponse, CatalogFilter, Category, Constraint, ExampleResponse,
     Page, Profile, PublicConfig, SavedSearchCreate, SavedSearchPatch,
     SavedSearchResponse, SearchRequest, SearchResponse,
 )
 
 router = APIRouter(prefix="/api/v1")
-POLICY_VERSION = "selection-v1"
 
 
-def serialize_filter(item: db.Filter) -> dict:
-    return {
-        "id": item.id, "category_id": item.category_id, "label": item.label,
-        "description": item.description, "subcategory": item.subcategory,
-        "aliases": [alias.text for alias in item.aliases],
-        "levels": [dict(id=link.level.id, label=link.level.label, dimension=link.level.dimension,
-                        rank=link.level.rank, supports_exact=link.supports_exact,
-                        supports_minimum=link.supports_minimum) for link in item.level_links],
-    }
-
-
-def catalog(session: Session) -> list[dict]:
-    return [serialize_filter(item) for item in session.scalars(select(db.Filter).where(db.Filter.active).order_by(db.Filter.id))]
-
-
-def serialize_profile(item: db.Profile) -> dict:
-    return {"id": item.id, "display_name": item.display_name, "title": item.title,
-            "summary": item.summary, "experience_years": item.experience_years,
-            "competencies": [{"filter_id": fact.filter_id, "level_id": fact.level_id, "present": fact.present} for fact in item.competencies],
-            "languages": [{"filter_id": fact.filter_id, "level_id": fact.level_id, "present": fact.present} for fact in item.languages]}
-
-
-def validate_filters(filters, items):
-    by_id = {item["id"]: item for item in items}
-    seen = set()
-    for constraint in filters:
-        value = constraint.model_dump() if hasattr(constraint, "model_dump") else constraint
-        filter_id = value["filter_id"]
-        if filter_id in seen:
-            raise HTTPException(422, "A filter may appear only once; resolve contradictory selections")
-        seen.add(filter_id)
-        item = by_id.get(filter_id)
-        if item is None:
-            raise HTTPException(422, f"Unknown or inactive filter: {filter_id}")
-        if value.get("level_id"):
-            level = next((level for level in item["levels"] if level["id"] == value["level_id"]), None)
-            if level is None:
-                raise HTTPException(422, f"Level is not applicable to filter: {filter_id}")
-            operator = value.get("operator", "exact")
-            if operator == "minimum" and (level["rank"] is None or not level["supports_minimum"]):
-                raise HTTPException(422, f"Minimum level is not supported for: {filter_id}")
-            if operator == "exact" and not level["supports_exact"]:
-                raise HTTPException(422, f"Exact level is not supported for: {filter_id}")
+def validate_filters(filters: list[Constraint], items: list[dict]) -> None:
+    """Use the same constraint rules for API input and provider output."""
+    validate_constraints([item.model_dump() for item in filters], items)
 
 
 def paginate(items, page, page_size):
@@ -119,53 +74,7 @@ def examples(session: Session = Depends(get_db)):
 
 @router.post("/analyses", response_model=AnalysisResponse)
 def create_analysis(payload: AnalysisRequest, session: Session = Depends(get_db)):
-    from backend.app.services.decisions import analyze
-
-    settings = get_settings()
-    request_id = payload.request_id or str(uuid4())
-    request_data = payload.model_dump(exclude={"request_id"})
-    request_hash = hashlib.sha256(json.dumps(request_data, sort_keys=True).encode()).hexdigest()
-    # Serialize retries with the same id across workers before making a provider call.
-    from sqlalchemy import text
-    session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": request_id})
-    existing = session.scalar(select(db.Analysis).where(db.Analysis.request_id == request_id))
-    if existing:
-        if existing.request_hash != request_hash:
-            raise HTTPException(409, "This request ID was already used for different state or filters")
-        return existing.result
-    items = catalog(session)
-    validate_filters(payload.current_filters, items)
-    start = perf_counter()
-    result = analyze(payload.state_text, items, [item.model_dump() for item in payload.current_filters],
-                     provider=settings.decision_provider, model=settings.jev_model,
-                     api_key=settings.typesafe_api_key.get_secret_value() if settings.typesafe_api_key else None,
-                     timeout_seconds=settings.request_timeout_seconds, max_retries=settings.max_retries,
-                     candidate_budget=settings.candidate_filter_budget, select_threshold=settings.select_threshold,
-                     reject_threshold=settings.reject_threshold, max_filters_per_category=settings.max_filters_per_category)
-    validate_filters(result["filters"], items)
-    catalog_version = hashlib.sha256(json.dumps(items, sort_keys=True).encode()).hexdigest()[:16]
-    response = AnalysisResponse(id=str(uuid4()), state_text=payload.state_text, client_revision=payload.client_revision,
-                                provider=settings.decision_provider, model=result.get("model"), policy_version=POLICY_VERSION,
-                                catalog_version=catalog_version, status="completed", created_at=datetime.now(timezone.utc),
-                                duration_ms=round((perf_counter() - start) * 1000, 2), filters=result["filters"],
-                                decisions=result["decisions"], provider_response=result["provider_response"], usage=result.get("usage") or {})
-    response_data = response.model_dump(mode="json")
-    row = db.Analysis(id=response.id, request_id=request_id, request_hash=request_hash, state_text=payload.state_text,
-                      client_revision=payload.client_revision, submitted_filters=request_data["current_filters"],
-                      provider=response.provider, model=response.model, policy_version=POLICY_VERSION,
-                      catalog_version=catalog_version, status=response.status, duration_ms=response.duration_ms,
-                      created_at=response.created_at, result=response_data)
-    session.add(row)
-    session.flush()
-    for decision in response_data["decisions"]:
-        session.add(db.AnalysisDecision(analysis_id=response.id, question_id=decision["question_id"],
-                                       filter_id=decision["filter_id"], primitive=decision["primitive"], status=decision["status"], payload=decision))
-    session.add(db.ProviderResponse(analysis_id=response.id, request=request_data, response=response_data["provider_response"], usage=response_data["usage"]))
-    session.commit()
-    logging.getLogger("jev.analysis").info(
-        "Analysis completed id=%s provider=%s model=%s duration_ms=%s catalog_filters=%s decisions=%s",
-        response.id, response.provider, response.model, response.duration_ms, len(items), len(response.decisions))
-    return response
+    return analysis_service.create_analysis(payload, session, get_settings())
 
 
 @router.get("/analyses", response_model=Page[AnalysisResponse])
@@ -187,7 +96,6 @@ def analysis_detail(analysis_id: str, session: Session = Depends(get_db)):
 def search_profiles(payload: SearchRequest, session: Session = Depends(get_db)):
     from backend.app.services.matching import search_profiles as match
     items = catalog(session)
-    validate_filters(payload.filters, items)
     category_ids = {item["category_id"] for item in items}
     if set(payload.category_grouping) - category_ids:
         raise HTTPException(422, "Unknown category in grouping")

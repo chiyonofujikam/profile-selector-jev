@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$SetupOnly,
+    [switch]$Demo,
     [ValidateRange(1, 65535)][int]$BackendPort = 8000,
     [ValidateRange(1, 65535)][int]$FrontendPort = 5173
 )
@@ -35,6 +36,7 @@ try {
 
     $launchArguments = @('run', '--project', 'backend', '--locked', 'python', '-m', 'scripts.dev', '--backend-port', "$BackendPort", '--frontend-port', "$FrontendPort")
     if ($SetupOnly) { $launchArguments += '--setup-only' }
+    if ($Demo) { $launchArguments += '--demo' }
     & $uvExecutable @launchArguments
     exit $LASTEXITCODE
 }

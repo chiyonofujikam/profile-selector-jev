@@ -105,9 +105,40 @@ def test_setup_only_provisions_and_migrates_without_starting_servers(launch_root
     assert commands[0][1]["env"]["VITE_API_URL"] == "http://127.0.0.1:8002"
 
 
+def test_launcher_applies_env_file_over_old_terminal_provider(launch_root, monkeypatch):
+    set_key(launch_root / ".env", "DECISION_PROVIDER", "jev")
+    monkeypatch.setenv("DECISION_PROVIDER", "mock")
+    config = dev_database.load_database_config(launch_root)
+    commands = []
+    monkeypatch.setattr(dev, "ROOT", launch_root)
+    monkeypatch.setattr(dev.shutil, "which", lambda name: name)
+    monkeypatch.setattr(dev, "ensure_environment_file", lambda _root: None)
+    monkeypatch.setattr(dev, "provision_database", lambda _root: config)
+    monkeypatch.setattr(dev, "ensure_frontend_dependencies", lambda *_args: None)
+    monkeypatch.setattr(dev, "run_checked", lambda command, **kwargs: commands.append(kwargs))
+    assert dev.main(["--setup-only"]) == 0
+    assert commands[0]["env"]["DECISION_PROVIDER"] == "jev"
+
+
+def test_demo_mode_seeds_after_migrations_without_starting_servers(launch_root, monkeypatch):
+    config = dev_database.load_database_config(launch_root)
+    commands = []
+    monkeypatch.setattr(dev, "ROOT", launch_root)
+    monkeypatch.setattr(dev.shutil, "which", lambda name: name)
+    monkeypatch.setattr(dev, "ensure_environment_file", lambda _root: None)
+    monkeypatch.setattr(dev, "provision_database", lambda _root: config)
+    monkeypatch.setattr(dev, "ensure_frontend_dependencies", lambda *_args: None)
+    monkeypatch.setattr(dev, "run_checked", lambda command, **kwargs: commands.append((command, kwargs)))
+    monkeypatch.setattr(dev, "run_services", lambda *_args: pytest.fail("Setup-only must not start servers"))
+    assert dev.main(["--setup-only", "--demo"]) == 0
+    assert commands[0][0][-4:] == ["-m", "alembic", "upgrade", "head"]
+    assert commands[1][0][-2:] == ["-m", "scripts.seed_demo"]
+    assert commands[1][1]["env"]["DATABASE_URL"] == config.database_url
+
+
 def test_healthy_existing_services_are_reused_and_never_owned(launch_root, monkeypatch):
     cleanup = []
-    monkeypatch.setattr(dev, "backend_ready", lambda _port: True)
+    monkeypatch.setattr(dev, "backend_ready", lambda _port, **_kwargs: True)
     monkeypatch.setattr(dev, "frontend_ready", lambda _port: True)
     monkeypatch.setattr(dev, "start_service", lambda *_args, **_kwargs: pytest.fail("Do not duplicate existing services"))
     monkeypatch.setattr(dev, "stop_owned", lambda services: cleanup.append(list(services)))
@@ -118,7 +149,7 @@ def test_healthy_existing_services_are_reused_and_never_owned(launch_root, monke
 def test_startup_failure_cleans_up_only_the_started_backend(launch_root, monkeypatch):
     backend = dev.Service("backend", SimpleNamespace())
     cleanup = []
-    monkeypatch.setattr(dev, "backend_ready", lambda _port: False)
+    monkeypatch.setattr(dev, "backend_ready", lambda _port, **_kwargs: False)
     monkeypatch.setattr(dev, "frontend_ready", lambda _port: False)
     monkeypatch.setattr(dev, "port_available", lambda _port: True)
     monkeypatch.setattr(dev, "wait_ready", lambda *_args, **_kwargs: None)
@@ -138,7 +169,7 @@ def test_startup_failure_cleans_up_only_the_started_backend(launch_root, monkeyp
 def test_ctrl_c_stops_owned_frontend_but_leaves_reused_backend(launch_root, monkeypatch):
     frontend = dev.Service("frontend", SimpleNamespace(poll=lambda: None))
     cleanup = []
-    monkeypatch.setattr(dev, "backend_ready", lambda _port: True)
+    monkeypatch.setattr(dev, "backend_ready", lambda _port, **_kwargs: True)
     monkeypatch.setattr(dev, "frontend_ready", lambda _port: False)
     monkeypatch.setattr(dev, "port_available", lambda _port: True)
     monkeypatch.setattr(dev, "start_service", lambda *_args, **_kwargs: frontend)
@@ -151,10 +182,37 @@ def test_ctrl_c_stops_owned_frontend_but_leaves_reused_backend(launch_root, monk
 
 def test_unrelated_occupied_backend_port_is_not_taken_over(launch_root, monkeypatch):
     cleanup = []
-    monkeypatch.setattr(dev, "backend_ready", lambda _port: False)
+    monkeypatch.setattr(dev, "backend_ready", lambda _port, **_kwargs: False)
     monkeypatch.setattr(dev, "port_available", lambda _port: False)
     monkeypatch.setattr(dev, "start_service", lambda *_args, **_kwargs: pytest.fail("Do not take over another service"))
     monkeypatch.setattr(dev, "stop_owned", lambda services: cleanup.append(list(services)))
     with pytest.raises(RuntimeError, match="occupied"):
+        dev.run_services(launch_root, "npm", {}, 8000, 5173)
+    assert cleanup == [[]]
+
+
+@pytest.mark.parametrize("running,provider,model,expected", [
+    ({"provider": "mock", "model": "deterministic-demo"}, "jev", "jev-latest", False),
+    ({"provider": "jev", "model": "jev-latest"}, "jev", "jev-latest", True),
+    ({"provider": "jev", "model": "jev-preview"}, "jev", "jev-latest", False),
+    ({"provider": "mock", "model": "deterministic-demo"}, "mock", "jev-latest", True),
+])
+def test_backend_readiness_checks_the_requested_provider_and_model(monkeypatch, running, provider, model, expected):
+    def response(url):
+        if url.endswith("/health"):
+            return {"database": {"ready": True}}
+        return {**running, "policy_version": "fixture"}
+    monkeypatch.setattr(dev, "http_json", response)
+    assert dev.backend_ready(8000, provider=provider, model=model) is expected
+
+
+def test_stale_mock_backend_is_not_reused_for_jev(launch_root, monkeypatch):
+    set_key(launch_root / ".env", "DECISION_PROVIDER", "jev")
+    cleanup = []
+    monkeypatch.setattr(dev, "backend_ready", lambda _port, **kwargs: kwargs.get("provider") is None)
+    monkeypatch.setattr(dev, "port_available", lambda _port: False)
+    monkeypatch.setattr(dev, "start_service", lambda *_args, **_kwargs: pytest.fail("Do not start over an existing backend"))
+    monkeypatch.setattr(dev, "stop_owned", lambda services: cleanup.append(list(services)))
+    with pytest.raises(RuntimeError, match="different Jev settings"):
         dev.run_services(launch_root, "npm", {}, 8000, 5173)
     assert cleanup == [[]]

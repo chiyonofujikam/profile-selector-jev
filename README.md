@@ -1,120 +1,109 @@
-# Smart Filter Selector with Jev
+# Profile Selector with Jev
 
-A local engineering profile search dashboard. Describe a requirement, inspect and edit the catalog filters Jev proposes, and search candidates using explicit requirements and level constraints.
+Describe the expertise you need. Jev turns your text into editable catalog filters; the app uses those filters to find matching profiles.
 
-The application uses React/TypeScript/Vite, FastAPI, SQLAlchemy/Alembic, and PostgreSQL in Docker. The backend owns TypeSafe credentials and all provider calls. PostgreSQL is required; there is no SQLite fallback.
+The interface has three steps:
 
-The initial database is intentionally empty. Candidate records, example states, reviewed level mappings, and representative evaluation data await the user's examples, as specified in [PROJECT_PLAN.md](PROJECT_PLAN.md). The preserved legacy taxonomy is reference material and is never seeded automatically.
+1. **Describe** skills, languages, levels, and exclusions, then submit to Jev.
+2. **Review** the suggested filters or select them manually.
+3. **View matches** and inspect matched, unmet, and unknown requirements.
 
-## Quick start (Windows)
+The response panel shows every returned decision and probability. Saved searches and analysis history are available from the header.
 
-Start Docker Desktop, then run this from the repository root:
+## Run locally
+
+Install Python 3.13, uv, Node.js, and Docker Desktop. Start Docker Desktop, then **double-click `run.cmd`** or run from the repository root:
 
 ```powershell
 .\run.cmd
 ```
 
-The launcher uses `POSTGRES_PASSWORD` from the root `.env`, prepares the database with that password, applies migrations, and starts the frontend and backend. It installs locked dependencies when needed and keeps the Python environment in `backend/.venv`. Existing database records are preserved, and `DATABASE_URL` is aligned with the configured local PostgreSQL credentials.
+The launcher installs locked dependencies, prepares PostgreSQL, applies migrations, and starts both servers. It asks for a local database password if one is missing. Existing `.env` values and database records are retained.
 
-Open `http://127.0.0.1:5173` for the dashboard or `http://127.0.0.1:8000/docs` for the API. Keep the launcher terminal open; Ctrl+C stops the frontend and backend processes it started. PostgreSQL stays running with its persistent volume. Healthy services that were already running are reused and are not stopped by the launcher.
+Keep the launcher window open while using the app. If startup fails, the window stays open so you can read the error. Run `.\run.cmd --help` for setup-only and custom-port options.
 
-For database/dependency setup without starting either application server:
+- App: [localhost:5173](http://127.0.0.1:5173)
+- API docs: [localhost:8000/docs](http://127.0.0.1:8000/docs)
+- Ctrl+C stops the application servers started by the launcher. PostgreSQL keeps its data.
 
-```powershell
-.\run.cmd -SetupOnly
-```
-
-The equivalent PowerShell entry point is `.\run.ps1`. Node.js, uv, and Docker Desktop must be installed; the launcher reports missing tools without changing unrelated services.
-
-## Local setup
-
-Install Python 3.13, [uv](https://docs.astral.sh/uv/getting-started/installation/), a current Node.js LTS release, and Docker Desktop with Linux containers. Run the commands below from the repository root. Backend dependencies live in `backend/pyproject.toml`; uv creates the Python environment at `backend/.venv`. Keep `backend/uv.lock` and `frontend/package-lock.json` in source control. The `--project backend` option selects this environment without requiring activation or a shell environment variable. Add backend dependencies with `uv add --project backend PACKAGE`.
-
-1. Create `.env` from `.env-example` **only if `.env` does not already exist**. Review the database credentials and ports. The `DATABASE_URL` credentials and port must agree with the PostgreSQL settings.
-2. Install backend dependencies, start the database, and apply migrations:
-
-   ```powershell
-   uv sync --project backend --locked
-   docker compose --env-file .env up -d postgres
-   docker compose --env-file .env ps
-   uv run --project backend alembic upgrade head
-   ```
-
-   Wait for the `postgres` service to report healthy before running migrations. Inspect readiness with `docker compose --env-file .env exec postgres pg_isready`. Normal restarts retain records in the named volume. `docker compose --env-file .env down` stops the service without removing that volume.
-
-3. Start the backend in one terminal:
-
-   ```powershell
-   uv run --project backend uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-   ```
-
-4. Install and start the frontend in another terminal:
-
-   ```powershell
-   npm --prefix frontend ci
-   npm --prefix frontend run dev
-   ```
-
-Open the URL Vite prints, normally `http://127.0.0.1:5173`. API documentation is at `http://127.0.0.1:8000/docs`; `GET /health` reports database and provider readiness separately. Vite reads the root environment file, exposing only `VITE_*` variables. Its development proxy sends `/api` and `/health` requests to the local backend. Build the frontend with `npm --prefix frontend run build`.
-
-If a tool is installed but unavailable in a new terminal, add its installation directory to `PATH` or reopen the terminal. Do not replace an existing environment file or commit credentials.
-
-A healthy PostgreSQL container does not verify the application's password. Docker's `POSTGRES_*` variables initialize an empty data directory; changing them later does not update roles in the persistent volume. If authentication fails, synchronize the existing role's password with `DATABASE_URL` and `POSTGRES_PASSWORD`, preserving the volume. Restart the API after `.env` changes because connection settings are loaded at startup. Check `/health`: `database.reachable` confirms the application can connect, `database.migrated` confirms the schema is current, and `database.ready` requires both.
-
-## Decision modes
-
-- `DECISION_PROVIDER=mock` uses deterministic catalog matching without an API key. The dashboard labels mock decisions and heuristic values. Mock mode still requires PostgreSQL and a reviewed catalog; it does not generate candidates or establish model accuracy.
-- `DECISION_PROVIDER=jev` uses the official TypeSafe Python SDK. Configure the backend-only API key and model using `.env-example`. Provider errors are reported directly, with no silent switch to mock mode. Configured credentials do not establish that live access or domain quality has been verified.
-
-The state text is submitted only when requested. Manual filter edits refresh candidate searches, and delayed analyses cannot overwrite newer edits. The response inspector retains every returned decision and distribution, including uncertain and rejected values. Candidate match scores, model probabilities, and model confidence have separate meanings.
-
-## Reviewed data import
-
-The import command accepts a versioned UTF-8 JSON envelope, validates IDs and references, and applies all changes in one PostgreSQL transaction. Repeating the same file updates the same IDs. Imported filters replace their alias/level associations; imported profiles replace their competency/language associations. Records omitted from the file remain unchanged.
+To load the supplied filters and fictional demo profiles, run:
 
 ```powershell
-uv run --project backend python -m scripts.import_data local-data/reviewed.json --validate-only
-uv run --project backend python -m scripts.import_data local-data/reviewed.json --dry-run
-uv run --project backend python -m scripts.import_data local-data/reviewed.json
+.\run.cmd -Demo
 ```
 
-`--validate-only` checks JSON structure without contacting PostgreSQL. `--dry-run` checks the actual database references and constraints, then rolls back. Keep private input files under the ignored `local-data/` directory. The required schema and review procedure are documented in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+This imports the complete taxonomy from `data/values_with_context.json`, tool levels from `data/levels.json`, 12 synthetic profiles, and five sample requirements. Start a new search and try:
 
-To prepare the existing taxonomy for review without changing the database:
+| Requirement | Expected matches in mock mode |
+| --- | --- |
+| `Railway and DOORS` | 4 |
+| `DOORS advanced or higher` | 3 |
+| `Railway and DOORS, excluding Metro` | 3 |
+| `Energy and Python` | 2 |
+| `Railway and CATIA` | 1 |
 
-```powershell
-uv run --project backend python -m scripts.convert_legacy --output local-data/catalog-review.json
+Demo data works with either decision provider; loading it does not change your Jev settings. Repeating `-Demo` updates the same demo IDs and catalog records, without deleting unrelated profiles. It restores the generated demo records, so use your own IDs for custom profiles. The generated import file is `local-data/demo.json`; edit the fictional profile definitions in `scripts/seed_demo.py` to change future demo loads.
+
+Plain `run.cmd` retains your existing data and does not seed anything. For your own catalog and profiles, use [the data guide](docs/IMPLEMENTATION.md).
+
+For manual startup, custom ports, database troubleshooting, and integration-test setup, see [development instructions](docs/DEVELOPMENT.md).
+
+## Configure Jev
+
+Settings live in the root `.env`. A small reference is provided in [`.env-example`](.env-example); keep your existing `.env` if you already have one.
+
+```dotenv
+DECISION_PROVIDER=jev
+TYPESAFE_API_KEY=your-backend-api-key
+JEV_MODEL=jev-latest
 ```
 
-This preserves the legacy category keys, text, and source paths, assigns deterministic IDs, and collapses only identical records at the same path. It does not create profiles, aliases, language records, or level associations. Review the generated file against the user's examples before importing it. Different paths with the same label remain different records. Conflicting duplicates cause conversion to fail.
+Restart the backend after changing settings. The TypeSafe SDK calls `system_one` with typed **Noul** questions for relevance, exclusion, and required status, and **Choice** questions for levels and comparisons. The API key stays on the backend.
 
-## Verification and current boundaries
+`DECISION_PROVIDER=mock` runs deterministic catalog-name and alias rules without a key. Demo values are not model probabilities. Provider failures in live mode are reported to the user.
+
+## Read the code
+
+Start with these two flows:
+
+```text
+Frontend: App → useSearch → POST /api/v1/analyses → editable filters
+Backend:  analysis → decisions → retrieval → Jev → selection policy
+Matches:  edited filters → POST /api/v1/profiles/search → matching
+```
+
+| File | Responsibility |
+| --- | --- |
+| `frontend/src/App.tsx` | Page layout and requirement input. |
+| `frontend/src/hooks/useSearch.ts` | Search state, explicit submission, retry IDs, and protection for newer edits. |
+| `frontend/src/components/FiltersPanel.tsx` | Browse the catalog and edit filters. |
+| `frontend/src/components/CandidatesPanel.tsx` | Fetch matches and show profile evidence. |
+| `frontend/src/components/ResponsePanel.tsx` | Inspect and export decisions and provider JSON. |
+| `frontend/src/components/SearchLibrary.tsx` | Save, restore, and delete searches; restore analyses. |
+| `backend/app/api/routes.py` | HTTP endpoints. |
+| `backend/app/schemas/__init__.py` | API request and response types. |
+| `backend/app/services/analysis.py` | Reuse request IDs and store completed analyses. |
+| `backend/app/services/decisions.py` | Build typed questions, validate answers, and apply thresholds. |
+| `backend/app/services/jev.py` | TypeSafe SDK call and provider error handling. |
+| `backend/app/services/mock.py` | Local demo rules. |
+| `backend/app/services/retrieval.py` | Shortlist catalog filters from names, aliases, and text overlap. |
+| `backend/app/services/matching.py` | Shared filter validation and profile matching. |
+| `backend/app/db/` | Database models, sessions, and record serialization. |
+| `scripts/seed_demo.py` | Build and import the supplied catalog with fictional profiles. |
+
+Only submitting the requirement calls Jev. Editing filters refreshes matches automatically. A delayed analysis cannot overwrite newer edits, and retrying unchanged input reuses its request ID.
+
+Required filters determine eligibility; preferred filters affect ranking. Exclusions always apply. A level belongs to one filter and can mean exact or minimum. Missing evidence stays unknown. Match scores, Noul probabilities, and Choice confidence are different values.
+
+## Check changes
 
 ```powershell
 uv run --project backend pytest
 npm --prefix frontend test
 npm --prefix frontend run build
-```
-
-Backend unit tests use isolated fixtures, never product seed data. PostgreSQL integration checks require Docker and migrated tables. Verify database migrations and record persistence using PostgreSQL before relying on a local release. Live TypeSafe verification requires configured credentials and network access; domain-quality evaluation requires the forthcoming reviewed examples. The current implementation does not include authentication, CV ingestion, automatic hiring decisions, or hosted deployment.
-
-To run PostgreSQL integration tests, create a dedicated database once and use a separate terminal. These commands use the configured PostgreSQL user and derive the test connection URL from backend settings without displaying its credentials:
-
-```powershell
-docker compose --env-file .env exec postgres sh -c 'createdb -U "$POSTGRES_USER" jev_test'
-$env:TEST_DATABASE_URL = uv run --project backend python -c "from sqlalchemy.engine import make_url; from backend.app.core.config import get_settings; print(make_url(get_settings().database_url).set(database='jev_test').render_as_string(hide_password=False))"
-$env:DATABASE_URL = $env:TEST_DATABASE_URL
-$env:DECISION_PROVIDER = 'mock'
-uv run --project backend alembic upgrade head
-uv run --project backend pytest
-```
-
-Tests require a PostgreSQL database name ending in `_test`; their fixture data is rolled back. Close that terminal afterward so the test-only environment variables do not affect normal startup. Reusing an existing migrated test database does not require `createdb` again.
-
-Optional browser verification uses the locally installed Microsoft Edge browser. Start the API and Vite with the commands above, then run:
-
-```powershell
 npm --prefix frontend run test:browser
 ```
 
-This read-only smoke test checks the initial empty workspace, response expansion, dialog focus, keyboard dismissal, desktop layout, and mobile navigation at `http://127.0.0.1:5173`. It expects an empty product database and writes ignored screenshots under `frontend/test-results/`. The frontend unit tests use isolated API fixtures to cover populated searches, delayed response protection, full probability inspection, and provider failure/retry without calling TypeSafe.
+Browser tests start Vite automatically and use isolated API fixtures in Microsoft Edge. They do not call Jev or change product data. PostgreSQL integration tests require a separate database ending in `_test`; see [development instructions](docs/DEVELOPMENT.md).
+
+Live Jev access and domain accuracy require configured credentials and reviewed examples. Synthetic demo profiles are for exploring the workflow. The app currently provides local search, without authentication or hosted deployment.
