@@ -66,7 +66,7 @@ export function ResponsePanel({ analysis, stale }: { analysis: Analysis | null; 
         </div>
         {tab === 'json' ? <pre className="json-view" role="tabpanel">{JSON.stringify(analysis.provider_response, null, 2)}</pre>
           : <div role="tabpanel">{!analysis.decisions.length ? <p>No catalog decisions were returned.</p>
-            : <div className="table-scroll"><table className="decision-table">
+            : <div className="table-scroll"><table className="decision-table" aria-label="Model decisions">
               <thead><tr><th>Filter / question</th><th>Result</th><th>Probability / distribution</th><th>Confidence</th><th>Threshold / source</th></tr></thead>
               <tbody>{analysis.decisions.map(decision => <DecisionRow key={decision.question_id} decision={decision} />)}</tbody>
             </table></div>}

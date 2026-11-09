@@ -27,9 +27,20 @@ test('minimal workspace, keyboard dialogs, and mobile layout', async ({ page }) 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Find the right expertise' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Update filters/ })).toBeDisabled()
-  await expect(page.getByText('No filters yet')).toBeVisible()
-  await expect(page.getByText('No profiles yet')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Show filters' })).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('textbox', { name: 'Search catalog filters' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Show candidates' })).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('table', { name: 'Matching candidates' })).toHaveCount(0)
   await page.screenshot({ path: 'test-results/dashboard-desktop.png', fullPage: true })
+
+  await page.getByRole('button', { name: 'Show filters' }).click()
+  await expect(page.getByText('No selected filters')).toBeVisible()
+  await page.getByRole('button', { name: 'Browse catalog' }).click()
+  await expect(page.getByText('No filters yet')).toBeVisible()
+  await page.getByRole('button', { name: 'Hide filters' }).click()
+  await page.getByRole('button', { name: 'Show candidates' }).click()
+  await expect(page.getByText('No profiles yet')).toBeVisible()
+  await page.getByRole('button', { name: 'Hide candidates' }).click()
 
   await page.getByRole('button', { name: /Show response/ }).click()
   await expect(page.getByText('No analysis yet')).toBeVisible()
@@ -53,6 +64,9 @@ test('minimal workspace, keyboard dialogs, and mobile layout', async ({ page }) 
 
 test('analyze, save, restore, and delete a search', async ({ page }) => {
   const saved: SavedSearch[] = []
+  const catalog = [filter, ...Array.from({ length: 29 }, (_, index) => ({
+    ...filter, id: `fixture-extra-${index}`, label: `Catalog filter ${index + 2}`,
+  }))]
   let providerCalls = 0
   await page.route('**/health', route => route.fulfill({ json: { status: 'ok', database: { ready: true }, provider: { ready: true } } }))
   await page.route('**/api/v1/**', async route => {
@@ -61,7 +75,7 @@ test('analyze, save, restore, and delete a search', async ({ page }) => {
     const body = request.method() === 'POST' ? request.postDataJSON() : null
     if (path.endsWith('/config')) return route.fulfill({ json: { provider: 'jev', model: 'fixture-model', max_state_length: 12000 } })
     if (path.endsWith('/categories')) return route.fulfill({ json: [{ id: 'fixture-tools', label: 'Tools', count: 1 }] })
-    if (path.endsWith('/filters')) return route.fulfill({ json: { items: [filter], total: 1, page: 1, page_size: 30 } })
+    if (path.endsWith('/filters')) return route.fulfill({ json: { items: catalog, total: catalog.length, page: 1, page_size: 30 } })
     if (path.endsWith('/analyses') && body) {
       providerCalls += 1
       const analysis: Analysis = {
@@ -86,7 +100,18 @@ test('analyze, save, restore, and delete a search', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('State', { exact: true }).fill('Need fixture skill')
   await page.getByRole('button', { name: /Update filters/ }).click()
+  await expect(page.getByText('1 active')).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Search filters' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Show filters' }).click()
   await expect(page.getByRole('checkbox', { name: /Fixture skill/ })).toBeChecked()
+  await expect(page.getByRole('table', { name: 'Search filters' }).getByRole('row')).toHaveCount(2)
+  await page.getByRole('checkbox', { name: 'Selected only' }).uncheck()
+  await expect(page.getByRole('table', { name: 'Search filters' }).getByRole('row')).toHaveCount(31)
+  const tableRegion = page.getByRole('region', { name: 'Scrollable search filters' })
+  expect(await tableRegion.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
+  await tableRegion.evaluate(element => { element.scrollTop = element.scrollHeight })
+  await expect(page.getByRole('columnheader', { name: 'Filter', exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/filters-table-desktop.png', fullPage: true })
   await page.getByRole('button', { name: 'Save search', exact: true }).click()
   await page.getByLabel('Search name').fill('My search')
   await page.getByRole('dialog').getByRole('button', { name: 'Save search', exact: true }).click()
@@ -105,4 +130,54 @@ test('analyze, save, restore, and delete a search', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: 'test-results/dashboard-populated-mobile.png', fullPage: true })
+  expect(await tableRegion.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+})
+
+test('collapsed candidates, scrolling, and profile details on desktop and mobile', async ({ page }) => {
+  const matches = Array.from({ length: 12 }, (_, index) => ({
+    profile: {
+      id: `candidate-fixture-${index}`, display_name: `Candidate fixture ${index + 1}`,
+      title: 'Test engineer', summary: 'Isolated browser fixture.', experience_years: index + 2,
+      competencies: [], languages: [],
+    },
+    score: 100, matched: ['Fixture skill'], unmet: [], unknown: [], eligible: true,
+  }))
+  let searches = 0
+  await page.route('**/health', route => route.fulfill({ json: { status: 'ok', database: { ready: true }, provider: { ready: true } } }))
+  await page.route('**/api/v1/**', route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/config')) return route.fulfill({ json: { provider: 'mock', model: 'fixture', max_state_length: 12000 } })
+    if (path.endsWith('/profiles/search')) {
+      searches += 1
+      return route.fulfill({ json: { items: matches, total: matches.length, page: 1, page_size: 12 } })
+    }
+    return route.fulfill({ json: [] })
+  })
+  await page.setViewportSize({ width: 1440, height: 1200 })
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: 'Show candidates' })).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('heading', { name: /3\. View matches 12$/ })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Matching candidates' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Show candidates' }).click()
+  const table = page.getByRole('table', { name: 'Matching candidates' })
+  const tableRegion = page.getByRole('region', { name: 'Scrollable candidates' })
+  await expect(table.getByRole('row')).toHaveCount(13)
+  expect(await tableRegion.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
+  await page.getByRole('button', { name: 'Candidate fixture 1', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('Fixture skill', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await tableRegion.evaluate(element => { element.scrollTop = element.scrollHeight })
+  await expect(page.getByRole('columnheader', { name: 'Candidate', exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/candidates-table-desktop.png', fullPage: true })
+  await page.getByRole('button', { name: 'Hide candidates' }).click()
+  await expect(table).toHaveCount(0)
+  await page.getByRole('button', { name: 'Show candidates' }).click()
+  await expect(table.getByRole('row')).toHaveCount(13)
+  expect(searches).toBe(1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await tableRegion.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: 'test-results/candidates-table-mobile.png', fullPage: true })
 })

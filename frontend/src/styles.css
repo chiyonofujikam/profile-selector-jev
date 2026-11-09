@@ -68,15 +68,22 @@ main { max-width: 960px; margin: auto; padding: 16px 20px 30px; }
 .filter-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .filter-toolbar > input { flex: 1; min-width: 140px; }
 .filter-toolbar label { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.active-filters { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
 .filter-chip { font-size: 12px; border-radius: 16px; padding: 5px 10px; background: #edf5ef; }
-.filter-row { padding: 16px 0; border-top: 1px solid var(--line); }
-.filter-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-.filter-description { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
-.filter-label { display: flex; align-items: center; gap: 8px; color: #202b28; font-size: 14px; font-weight: 600; }
+.filter-heading, .candidate-heading { margin-bottom: 0; }
+.filter-content, .candidate-content { margin-top: 20px; }
+.filters-table-scroll, .candidates-table-scroll { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; overscroll-behavior: contain; }
+.filters-table, .candidates-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.filters-table { min-width: 800px; }
+.candidates-table { min-width: 840px; }
+.filters-table th, .filters-table td, .candidates-table th, .candidates-table td { text-align: left; vertical-align: top; padding: 12px; border-bottom: 1px solid var(--line); }
+.filters-table thead th, .candidates-table thead th { position: sticky; top: 0; z-index: 1; background: #f5f7f5; font-weight: 600; }
+.filters-table tbody th { min-width: 240px; max-width: 300px; font-weight: 400; }
+.filters-table tr:last-child > *, .candidates-table tr:last-child > * { border-bottom: 0; }
+.filters-table select { font-size: 12px; min-width: 100px; }
+.filter-row-active { background: #f7faf8; }
+.filter-description { display: grid; gap: 4px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.filter-label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #202b28; font-size: 14px; font-weight: 600; }
 .source-label { font-size: 10px; color: var(--muted); font-weight: 400; }
-.filter-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0 29px; }
-.filter-controls select { font-size: 12px; }
 .search-actions { display: flex; justify-content: flex-end; margin: -8px 0 20px; }
 .empty-state { text-align: center; padding: 30px 12px; color: var(--muted); }
 .empty-state h3 { color: #35463c; margin-bottom: 8px; }
@@ -88,10 +95,12 @@ main { max-width: 960px; margin: auto; padding: 16px 20px 30px; }
 .badge { display: inline-block; padding: 4px 8px; border-radius: 5px; background: #eff3f0; font-size: 11px; white-space: nowrap; }
 .badge-amber { background: #fcf1d9; color: #765522; }
 .badge-green { background: #e8f5eb; color: #24634c; }
-.candidate { width: 100%; display: flex; justify-content: space-between; gap: 16px; text-align: left; padding: 16px 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
-.candidate p { margin: 5px 0; color: var(--muted); }
-.match-score { font-size: 20px; font-weight: 600; text-align: right; white-space: nowrap; }
-.match-score small { display: block; font-weight: 400; margin-top: 5px; }
+.candidate-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.candidates-table tbody th { min-width: 180px; }
+.candidates-table td:nth-child(2) { min-width: 170px; max-width: 240px; }
+.candidates-table .candidate-number, .candidates-table thead th:nth-child(n+3) { text-align: right; white-space: nowrap; }
+.candidate-name { padding: 0; border: 0; background: transparent; color: var(--green); font-weight: 600; text-align: left; }
+.candidate-name:hover:not(:disabled) { background: transparent; text-decoration: underline; }
 .pagination { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
 .pagination > div { display: flex; align-items: center; gap: 10px; }
 .response-panel { padding: 0; }
@@ -139,12 +148,9 @@ footer { padding: 12px 0; text-align: center; color: var(--muted); font-size: 12
   .state-actions .primary { flex: 1; font-size: 12px; }
   .filter-toolbar > input { width: 100%; flex-basis: 100%; }
   .filter-toolbar label { flex-wrap: wrap; }
-  .filter-controls { margin-left: 0; }
   .response-panel { padding: 0; }
   .response-toggle { padding: 18px; align-items: flex-start; }
   .response-end { flex-wrap: wrap; justify-content: flex-end; }
   .response-content { padding: 0 18px 18px; }
   .tab-bar { flex-wrap: wrap; }
-  .candidate { gap: 10px; }
-  .candidate small { font-size: 11px; }
 }
