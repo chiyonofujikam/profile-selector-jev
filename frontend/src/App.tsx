@@ -36,7 +36,7 @@ export default function App() {
   const maxLength = config?.max_state_length || 12000
   return <div>
     <header className="app-header">
-      <a className="brand" href="#main">Decision model<span> / profile selector</span></a>
+      <a className="brand" href="#main">Profile Selector<span> / Decision model</span></a>
       <nav aria-label="Search tools">
         <button onClick={() => setLibrary('saved')}>Saved searches</button>
         <button onClick={() => setLibrary('history')}>Analysis history</button>
