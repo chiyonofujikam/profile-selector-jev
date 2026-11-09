@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react'
-import { post } from '../api/client'
-import type { Analysis, Constraint, SavedSearch } from '../api/types'
-
-export const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : 'Something went wrong. Please retry.'
+import { post } from './api'
+import type { Analysis, Constraint, SavedSearch } from './types'
+import { errorMessage } from './messages'
 
 /** Owns editable search state. Only an explicit submit calls Jev. */
 export function useSearch() {
@@ -45,10 +43,12 @@ export function useSearch() {
     if (!text.trim() || analyzing) return
     const submittedRevision = revisionRef.current
     // A retry of the same input reuses its ID to avoid duplicate provider calls.
-    if (pending.current?.revision !== submittedRevision) {
-      pending.current = { revision: submittedRevision, id: crypto.randomUUID() }
+    let request = pending.current
+    if (!request || request.revision !== submittedRevision) {
+      request = { revision: submittedRevision, id: crypto.randomUUID() }
+      pending.current = request
     }
-    const requestId = pending.current!.id
+    const requestId = request.id
     const requestSequence = ++sequence.current
     setAnalyzing(true)
     setError('')

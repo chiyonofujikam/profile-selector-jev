@@ -16,7 +16,6 @@ import subprocess
 import sys
 from threading import Thread
 import time
-from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 from dotenv import dotenv_values, set_key
@@ -68,7 +67,7 @@ def http_json(url: str) -> dict | None:
         with urlopen(url, timeout=2) as response:
             payload = json.load(response)
         return payload if isinstance(payload, dict) else None
-    except (OSError, ValueError, HTTPError, URLError):
+    except (OSError, ValueError):
         return None
 
 
@@ -88,7 +87,7 @@ def frontend_ready(port: int) -> bool:
     try:
         with urlopen(f"http://127.0.0.1:{port}/", timeout=2) as response:
             return "Smart Filter Selector" in response.read(65536).decode("utf-8", errors="replace")
-    except (OSError, HTTPError, URLError):
+    except OSError:
         return False
 
 
@@ -224,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         # explicitly applies the project's file to every child process.
         file_values = {key: value for key, value in dotenv_values(ROOT / ".env").items() if value is not None}
         environment = {**os.environ, **file_values, **database.environment}
-        allowed = (dotenv_values(ROOT / ".env").get("ALLOWED_ORIGINS") or "").split(",")
+        allowed = (file_values.get("ALLOWED_ORIGINS") or "").split(",")
         environment["ALLOWED_ORIGINS"] = ",".join(dict.fromkeys([value.strip() for value in allowed if value.strip()] + [f"http://127.0.0.1:{args.frontend_port}", f"http://localhost:{args.frontend_port}"]))
         environment["VITE_API_URL"] = f"http://127.0.0.1:{args.backend_port}"
         print("Applying database migrations...", flush=True)

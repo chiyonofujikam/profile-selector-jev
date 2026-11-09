@@ -69,7 +69,7 @@ def test_postgres_import_is_idempotent_and_transactional():
     from sqlalchemy.engine import make_url
     from sqlalchemy.orm import Session
 
-    from backend.app.db.models import Category, Filter, FilterAlias, FilterLevel, Profile, ProfileCompetency
+    from backend.app.models import Category, Filter, FilterAlias, FilterLevel, Profile, ProfileCompetency
 
     database_url = os.environ["TEST_DATABASE_URL"]
     parsed = make_url(database_url)

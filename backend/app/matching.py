@@ -1,8 +1,4 @@
-"""Transparent AND/OR matching with explicit unknown data and per-skill levels."""
-
-from __future__ import annotations
-
-from collections import defaultdict
+"""Compare each profile with the filters selected on the page."""
 
 
 def validate_constraints(filters: list[dict], catalog: list[dict]) -> None:
@@ -36,11 +32,11 @@ def validate_constraints(filters: list[dict], catalog: list[dict]) -> None:
             raise ValueError("Exact matching is not supported for this filter level.")
 
 
-def _evaluate(profile: dict, constraint: dict, item: dict) -> bool | None:
-    facts = {fact["filter_id"]: fact for fact in [*profile.get("competencies", []), *profile.get("languages", [])]}
+def matches_filter(facts: dict, constraint: dict, item: dict) -> bool | None:
+    """True means a match, False means no match, None means missing information."""
     fact = facts.get(constraint["filter_id"])
     if fact is None:
-        return None  # absence of a competency record does not establish absence
+        return None
     if fact.get("present") is False:
         return False
     wanted = constraint.get("level_id")
@@ -54,20 +50,42 @@ def _evaluate(profile: dict, constraint: dict, item: dict) -> bool | None:
         return None
     if constraint.get("operator", "exact") == "exact":
         return actual == wanted
-    if actual not in levels or levels[actual].get("rank") is None:
+    if levels[actual].get("rank") is None:
         return None
     return levels[actual]["rank"] >= levels[wanted]["rank"]
 
 
-def search_profiles(
-    profiles: list[dict], catalog: list[dict], filters: list[dict],
-    grouping: str = "and", category_grouping: dict[str, str] | None = None,
-) -> list[dict]:
-    """Return eligible profiles; unknown hard constraints cannot establish eligibility.
+def matches_group(results: list[bool], grouping: str) -> bool:
+    if not results:
+        return True
+    if grouping == "or":
+        return any(results)
+    return all(results)
 
-    Exclusions are always ANDed. Required includes are grouped by category using
-    category_grouping and combined using grouping. Preferred includes only rank.
-    """
+
+def filter_label(constraint: dict, item: dict) -> str:
+    label = item["label"]
+    if constraint.get("level_id"):
+        for level in item["levels"]:
+            if level["id"] == constraint["level_id"]:
+                comparison = ""
+                if constraint.get("operator") == "minimum":
+                    comparison = ">= "
+                label += f" ({comparison}{level['label']})"
+                break
+    if constraint.get("mode", "include") == "exclude":
+        label = "Exclude " + label
+    return label
+
+
+def search_profiles(
+    profiles: list[dict],
+    catalog: list[dict],
+    filters: list[dict],
+    grouping: str = "and",
+    category_grouping: dict[str, str] | None = None,
+) -> list[dict]:
+    """Required filters decide who appears. Preferred filters improve the score."""
     if grouping not in {"and", "or"}:
         raise ValueError("Grouping must be and or or.")
     category_grouping = category_grouping or {}
@@ -77,39 +95,69 @@ def search_profiles(
     by_id = {item["id"]: item for item in catalog}
     results = []
     for profile in profiles:
-        matched, unmet, unknown = [], [], []
-        required_groups: dict[str, list[bool]] = defaultdict(list)
+        facts = {}
+        for fact in profile.get("competencies", []) + profile.get("languages", []):
+            facts[fact["filter_id"]] = fact
+
+        matched = []
+        unmet = []
+        unknown = []
+        required_groups = {}
         exclusions_pass = True
-        matched_weight, total_weight = 0.0, 0.0
+        matched_weight = 0.0
+        total_weight = 0.0
+
         for constraint in filters:
             item = by_id[constraint["filter_id"]]
-            value = _evaluate(profile, constraint, item)
+            satisfied = matches_filter(facts, constraint, item)
             excluded = constraint.get("mode", "include") == "exclude"
-            satisfied = None if value is None else (not value if excluded else value)
-            label = item["label"]
-            if constraint.get("level_id"):
-                level = next(level for level in item["levels"] if level["id"] == constraint["level_id"])
-                label += f" ({'>= ' if constraint.get('operator') == 'minimum' else ''}{level['label']})"
+            required = constraint.get("requirement", "mandatory") == "mandatory"
+            label = filter_label(constraint, item)
+
+            # Missing information stays unknown, even for an exclusion.
+            if excluded and satisfied is not None:
+                satisfied = not satisfied
             if excluded:
-                label = "Exclude " + label
                 exclusions_pass = exclusions_pass and satisfied is True
-            elif constraint.get("requirement", "mandatory") == "mandatory":
-                required_groups[item["category_id"]].append(satisfied is True)
+            elif required:
+                category_id = item["category_id"]
+                required_groups.setdefault(category_id, []).append(satisfied is True)
+
             if satisfied is None:
                 unknown.append(label)
             elif satisfied:
                 matched.append(label)
             else:
                 unmet.append(label)
-            weight = 1.0 if constraint.get("requirement", "mandatory") == "mandatory" or excluded else 0.5
+
+            weight = 0.5
+            if required or excluded:
+                weight = 1.0
             total_weight += weight
             if satisfied is True:
                 matched_weight += weight
-        groups = [any(values) if category_grouping.get(category_id, grouping) == "or" else all(values)
-                  for category_id, values in required_groups.items()]
-        includes_pass = (any(groups) if grouping == "or" else all(groups)) if groups else True
-        eligible = exclusions_pass and includes_pass
-        if eligible:
-            results.append({"profile": profile, "score": round(100 * matched_weight / total_weight, 1) if total_weight else 0.0,
-                            "matched": matched, "unmet": unmet, "unknown": unknown, "eligible": True})
-    return sorted(results, key=lambda row: (-row["score"], row["profile"]["display_name"].casefold(), row["profile"]["id"]))
+
+        groups = []
+        for category_id, values in required_groups.items():
+            mode = category_grouping.get(category_id, grouping)
+            groups.append(matches_group(values, mode))
+
+        if not exclusions_pass or not matches_group(groups, grouping):
+            continue
+
+        score = 0.0
+        if total_weight:
+            score = round(100 * matched_weight / total_weight, 1)
+        results.append({
+            "profile": profile,
+            "score": score,
+            "matched": matched,
+            "unmet": unmet,
+            "unknown": unknown,
+            "eligible": True,
+        })
+
+    # Best score first, then name and ID for a stable order.
+    return sorted(results, key=lambda row: (
+        -row["score"], row["profile"]["display_name"].casefold(), row["profile"]["id"],
+    ))

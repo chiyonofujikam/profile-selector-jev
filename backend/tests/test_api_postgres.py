@@ -8,8 +8,8 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from backend.app.db import models as db
-from backend.app.db.session import get_db
+from backend.app import models as db
+from backend.app.database import get_db
 from backend.app.main import app
 
 
@@ -119,12 +119,12 @@ def test_catalog_filters_and_search_preserve_level_semantics(api):
 
 
 def test_blank_state_and_provider_errors_are_distinct(api, monkeypatch):
-    from backend.app.services import decisions
+    from backend.app import selection
     client, _ = api
     assert client.post("/api/v1/analyses", json={"state_text": "  "}).status_code == 422
     def failure(*args, **kwargs):
-        raise decisions.ProviderError("provider_timeout", "Jev request timed out. Please retry.", 504)
-    monkeypatch.setattr(decisions, "analyze", failure)
+        raise selection.ProviderError("provider_timeout", "Jev request timed out. Please retry.", 504)
+    monkeypatch.setattr(selection, "analyze", failure)
     result = client.post("/api/v1/analyses", json={"state_text": "DOORS"})
     assert result.status_code == 504
     assert result.json()["error"]["code"] == "provider_timeout"

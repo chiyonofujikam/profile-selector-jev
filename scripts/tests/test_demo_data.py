@@ -5,8 +5,8 @@ import os
 
 import pytest
 
-from backend.app.services.decisions import analyze
-from backend.app.services.matching import search_profiles
+from backend.app.selection import analyze
+from backend.app.matching import search_profiles
 from scripts.convert_legacy import convert_catalog
 from scripts.import_data import ImportPayload, import_payload
 from scripts.seed_demo import ROOT, build_demo_data
@@ -61,7 +61,7 @@ def test_demo_import_is_repeatable_and_preserves_unrelated_profiles():
     from sqlalchemy import create_engine, func, select
     from sqlalchemy.engine import make_url
     from sqlalchemy.orm import Session
-    from backend.app.db import models as db
+    from backend.app import models as db
 
     url = make_url(os.environ["TEST_DATABASE_URL"])
     assert url.get_backend_name() == "postgresql" and (url.database or "").endswith("_test")

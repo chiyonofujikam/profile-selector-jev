@@ -1,8 +1,8 @@
 from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine
-from backend.app.core.config import get_settings
-from backend.app.db.models import Base
+from backend.app.config import get_settings
+from backend.app.models import Base
 
 if context.config.config_file_name:
     fileConfig(context.config.config_file_name)

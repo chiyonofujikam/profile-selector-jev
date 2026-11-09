@@ -27,7 +27,7 @@ def sanitize(value):
     return value
 
 
-def _call_jev(state: dict, questions: dict, *, api_key, model, timeout_seconds, max_retries) -> dict:
+def call_jev(state: dict, questions: dict, *, api_key, model, timeout_seconds, max_retries) -> dict:
     if not api_key or not str(api_key).strip():
         raise ProviderError("provider_not_configured", "Live Jev requires a backend TypeSafe API key.", 503)
     try:
@@ -37,9 +37,15 @@ def _call_jev(state: dict, questions: dict, *, api_key, model, timeout_seconds, 
         )
     except ImportError as exc:
         raise ProviderError("provider_not_installed", "Install backend dependencies with uv sync --project backend --locked from the repository root to use live Jev.", 503) from exc
-    typed = {key: Noul(instructions=value["instructions"]) if value["type"] == "noul"
-             else Choice(instructions=value["instructions"], criteria=value["criteria"])
-             for key, value in questions.items()}
+    typed = {}
+    for question_id, question in questions.items():
+        if question["type"] == "noul":
+            typed[question_id] = Noul(instructions=question["instructions"])
+        else:
+            typed[question_id] = Choice(
+                instructions=question["instructions"],
+                criteria=question["criteria"],
+            )
     try:
         retry = RetryPolicy(max_retries=max_retries, timeout=timeout_seconds,
                             http_statuses={429, 500, 502, 503, 504, 529}, backoff_max=5.0)

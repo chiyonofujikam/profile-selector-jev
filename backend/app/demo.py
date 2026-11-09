@@ -3,7 +3,7 @@
 import re
 from collections import Counter
 
-from .retrieval import evidence_for, mention_spans
+from .filter_search import evidence_for, mention_spans
 
 _EXCLUSION = re.compile(r"\b(?:excluding|exclude|without|except|no|not|sans|sauf|exclure|excluant|sin|excepto|excluir)\b", re.I)
 _PREFERRED = re.compile(r"\b(?:prefer(?:red|ably)?|optional|nice.to.have|souhait[ée]|id[ée]alement|preferible|opcional)\b", re.I)
@@ -11,9 +11,9 @@ _MINIMUM = re.compile(r"\b(?:at least|minimum|or higher|or above|au moins|ou plu
 
 
 def _demo_facts(state: str, item: dict) -> dict:
-    evidence, origin, span = evidence_for(state, item)
+    evidence, span = evidence_for(state, item)
     if not span:
-        return {"relevance": False, "exclusion": False, "mandatory": False, "level": "unspecified", "operator": "unspecified", "evidence": None, "origin": "demo_logic"}
+        return {"relevance": False, "exclusion": False, "mandatory": False, "level": "unspecified", "operator": "unspecified", "evidence": None}
     start, end = span
     before = re.split(r"[,;.\n]|\b(?:and|but|et|mais|y|pero)\b", state[:start], flags=re.I)[-1][-70:]
     after = re.split(r"[,;.\n]|\b(?:and|but|et|mais|y|pero)\b", state[end:], flags=re.I)[0][:70]
@@ -34,24 +34,32 @@ def _demo_facts(state: str, item: dict) -> dict:
             if adjacent_after or adjacent_before:
                 level_id = level["id"]
                 operator = "minimum" if _MINIMUM.search(state[max(0, min(start, level_start)-25):max(end, level_end)+25]) else "exact"
-                supported = (level.get("rank") is not None and level.get("supports_minimum", True)) if operator == "minimum" else level.get("supports_exact", True)
+                if operator == "minimum":
+                    supported = level.get("rank") is not None and level.get("supports_minimum", True)
+                else:
+                    supported = level.get("supports_exact", True)
                 if not supported:
                     level_id = "unsupported"
                 break
         if level_id != "unspecified":
             break
     return {"relevance": not excluded, "exclusion": excluded, "mandatory": not preferred,
-            "level": level_id, "operator": operator, "evidence": evidence, "origin": origin}
+            "level": level_id, "operator": operator, "evidence": evidence}
 
 
-def _mock(state: str, candidates: list[dict], questions: dict, mapping: dict, max_filters_per_category: int) -> dict:
+def analyze_demo(state: str, candidates: list[dict], questions: dict, mapping: dict, max_filters_per_category: int) -> dict:
     answers, decisions, selected, category_counts = {}, [], [], Counter()
     facts = {item["id"]: _demo_facts(state, item) for item in candidates}
     for question_id, meta in mapping.items():
         item, kind = meta["filter"], meta["kind"]
         fact, primitive = facts[item["id"]], questions[question_id]["type"]
         value = fact[kind]
-        status = ("selected" if value else "rejected") if isinstance(value, bool) else ("unspecified" if value == "unspecified" else "unsupported" if value == "unsupported" else "selected")
+        if isinstance(value, bool):
+            status = "selected" if value else "rejected"
+        elif value in {"unspecified", "unsupported"}:
+            status = value
+        else:
+            status = "selected"
         answers[question_id] = {"type": primitive, "selected_value": value, "value_kind": "deterministic_rule"}
         if isinstance(value, bool):
             answers[question_id]["heuristic_value"] = int(value)
@@ -72,10 +80,26 @@ def _mock(state: str, candidates: list[dict], questions: dict, mapping: dict, ma
             continue
         if not fact["exclusion"]:
             category_counts[item["category_id"]] += 1
-        selected.append({"filter_id": item["id"], "mode": "exclude" if fact["exclusion"] else "include",
-                         "requirement": "mandatory" if fact["mandatory"] or fact["exclusion"] else "preferred",
-                         "level_id": None if fact["level"] == "unspecified" else fact["level"],
-                         "operator": "exact" if fact["operator"] == "unspecified" else fact["operator"], "source": "demo_logic"})
+        mode = "include"
+        if fact["exclusion"]:
+            mode = "exclude"
+        requirement = "preferred"
+        if fact["mandatory"] or fact["exclusion"]:
+            requirement = "mandatory"
+        level_id = fact["level"]
+        if level_id == "unspecified":
+            level_id = None
+        operator = fact["operator"]
+        if operator == "unspecified":
+            operator = "exact"
+        selected.append({
+            "filter_id": item["id"],
+            "mode": mode,
+            "requirement": requirement,
+            "level_id": level_id,
+            "operator": operator,
+            "source": "demo_logic",
+        })
     return {"filters": selected, "decisions": decisions,
             "provider_response": {"provider": "mock", "model": "deterministic-v1", "value_kind": "deterministic_rule",
                                   "notice": "Demo rule outputs are not Jev probabilities. Domain quality awaits user examples.", "answers": answers},

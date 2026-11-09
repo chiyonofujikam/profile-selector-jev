@@ -1,3 +1,5 @@
+"""Read settings from the root .env file. Defaults work with the local launcher."""
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -5,7 +7,7 @@ from typing import Literal
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -32,7 +34,11 @@ class Settings(BaseSettings):
 
     @property
     def provider_ready(self) -> bool:
-        return self.decision_provider == "mock" or bool(self.typesafe_api_key and self.typesafe_api_key.get_secret_value())
+        if self.decision_provider == "mock":
+            return True
+        if self.typesafe_api_key is None:
+            return False
+        return bool(self.typesafe_api_key.get_secret_value())
 
 
 @lru_cache

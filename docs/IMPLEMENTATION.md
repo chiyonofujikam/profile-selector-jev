@@ -75,24 +75,16 @@ Suggested sequence:
 
 ## Matching and provider limits
 
-The versioned `/api/v1` routes are the canonical API. The legacy `/api/filter/analyze-query` route is not exposed: its global-level and confidence response shape has no agreed lossless mapping to per-filter levels, Noul probabilities, and Choice confidence. The plan makes a compatibility adapter conditional on that mapping. Legacy catalog keys remain preserved by the explicit converter. Imported example records have an API contract, while dashboard example shortcuts remain deferred until the user's reviewed scenarios arrive.
+The versioned `/api/v1` routes are the canonical API. Legacy catalog keys remain preserved by the explicit converter. Imported example records are available through `GET /api/v1/examples`; the dashboard does not currently show example shortcuts.
 
 Search requests explicitly specify AND/OR grouping. Mandatory conditions and exclusions govern eligibility; preferred conditions contribute to ranking. Level constraints distinguish exact from minimum operators. Missing evidence remains visible as unknown. Neither profile matching nor taxonomy membership implies unrecorded competencies.
 
 The mock decision path validates orchestration and UI behavior with deterministic catalog evidence. Its values are heuristic, not calibrated Jev probabilities. Live Jev uses typed Noul/Choice questions through the official SDK; selection thresholds are application policy. Every returned question and option probability is retained alongside policy decisions, with Noul probability separate from Choice confidence. Live credentials, latency, multilingual quality, precision/recall, and held-out domain quality require separate verification.
 
-PostgreSQL migration and restart-persistence checks require a working Docker engine. The application does not substitute an in-memory database or seed invented examples when that engine is unavailable.
+PostgreSQL migration and restart-persistence checks require a working Docker engine. Demo records are generated only by the explicit demo command; normal startup does not seed data.
 
-## Verification record
+## Verification
 
-Local verification on 4 November 2026 used Python 3.13.9, PostgreSQL 17.11 in Docker, FastAPI, React 19, and Vite 8. The final combined Python run passed 58 checks with PostgreSQL integrations enabled; frontend workflows passed 3 tests, the production frontend build passed, and the Edge browser smoke test passed 1 test.
+See [development instructions](DEVELOPMENT.md#tests) for the current test commands and dedicated PostgreSQL test setup. Python checks cover selection, matching, imports, persistence, and launcher behavior. Frontend and browser tests use isolated API fixtures, including saved searches, delayed responses, keyboard dialogs, and mobile layouts.
 
-The checks have exercised:
-
-- Locked Python dependency installation, Alembic migrations, and the FastAPI application against PostgreSQL in Docker.
-- Named-volume persistence: a committed saved-search marker and migration revision `5be32c366157` survived PostgreSQL container recreation. The marker was removed from the dedicated test database afterward.
-- PostgreSQL API contracts, complete provider-response JSONB persistence, request-ID idempotency, saved-search operations, matching/level semantics, and transactional import repeatability and rollback. Fixtures use a dedicated `_test` database and are rolled back.
-- Three frontend workflow tests covering state submission and candidate refresh, level/filter edits during delayed analyses, full probability inspection without additional provider calls, and provider failure/retry with the same request ID.
-- A production frontend build, plus Microsoft Edge browser checks of desktop/mobile layout, empty states, response-panel controls, keyboard dialog dismissal, modal focus, and mobile navigation.
-
-The browser smoke test reads the real local API and expects the intentionally empty product database. Populated workflow tests use isolated fixtures. These checks establish application behavior; they do not establish live Jev access or domain-quality results. No candidate dataset or user example scenarios have been synthesized. Live provider access has not been verified. Representative multilingual/domain evaluation awaits the reviewed examples described in the project plan.
+These checks establish application behavior. Live Jev access and domain accuracy require configured credentials and reviewed examples; the supplied synthetic demo data is for exploring the workflow.

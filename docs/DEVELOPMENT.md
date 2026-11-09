@@ -18,7 +18,7 @@ After changing Jev settings in `.env`, stop the original launcher with Ctrl+C be
 
 ## Start each service manually
 
-Create `.env` from [`.env-example`](../.env-example) only if `.env` does not already exist. Keep `DATABASE_URL` credentials and port aligned with `POSTGRES_*`.
+Create `.env` from [`.env-example`](../.env-example) only if `.env` does not already exist. For manual startup, set a nonempty `POSTGRES_PASSWORD` and uncomment `DATABASE_URL`, matching its credentials and port to `POSTGRES_*`.
 
 ```powershell
 uv sync --project backend --locked
@@ -42,7 +42,7 @@ npm --prefix frontend run dev
 
 Open [the app](http://127.0.0.1:5173) or [API documentation](http://127.0.0.1:8000/docs). Vite proxies `/api` and `/health` to the local backend. Set `VITE_API_URL` only when using another API address. Only `VITE_*` settings are exposed to the frontend.
 
-Backend dependencies and the Python environment live under `backend/`. Add a dependency with `uv add --project backend PACKAGE`; commit both lockfiles after dependency changes.
+Backend dependencies and the Python environment live under `backend/`. Add a dependency with `uv add --project backend PACKAGE` and commit `backend/pyproject.toml` with `backend/uv.lock`. Frontend dependency changes belong in `frontend/package.json` and `frontend/package-lock.json`.
 
 ## Data
 
@@ -89,7 +89,7 @@ docker compose --env-file .env exec postgres sh -c 'createdb -U "$POSTGRES_USER"
 In a separate PowerShell terminal, configure the test connection without displaying its credentials:
 
 ```powershell
-$env:TEST_DATABASE_URL = uv run --project backend python -c "from sqlalchemy.engine import make_url; from backend.app.core.config import get_settings; print(make_url(get_settings().database_url).set(database='jev_test').render_as_string(hide_password=False))"
+$env:TEST_DATABASE_URL = uv run --project backend python -c "from sqlalchemy.engine import make_url; from backend.app.config import get_settings; print(make_url(get_settings().database_url).set(database='jev_test').render_as_string(hide_password=False))"
 $env:DATABASE_URL = $env:TEST_DATABASE_URL
 $env:DECISION_PROVIDER = 'mock'
 uv run --project backend alembic upgrade head

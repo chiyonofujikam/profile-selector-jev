@@ -1,3 +1,5 @@
+"""Fields accepted and returned by the API. Pydantic checks these automatically."""
+
 from datetime import datetime
 from typing import Any, Generic, Literal, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -115,7 +117,7 @@ class Decision(Schema):
     filter_id: str
     filter_label: str
     question: str
-    primitive: Literal["noul", "choice", "score"]
+    primitive: Literal["noul", "choice"]
     kind: Literal["relevance", "exclusion", "mandatory", "level"]
     status: str
     probability: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)

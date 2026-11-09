@@ -1,3 +1,5 @@
+"""Database tables: catalog, profiles, analysis history, and saved searches."""
+
 from datetime import datetime, timezone
 from uuid import uuid4
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint

@@ -33,7 +33,7 @@ export type Decision = {
   filter_id: string
   filter_label: string
   question: string
-  primitive: 'noul' | 'choice' | 'score'
+  primitive: 'noul' | 'choice'
   kind: string
   status: string
   probability?: number | null

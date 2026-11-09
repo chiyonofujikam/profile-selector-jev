@@ -2,11 +2,11 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { Analysis, CatalogFilter, Constraint, ProfileMatch } from './api/types'
+import type { Analysis, CatalogFilter, Constraint, ProfileMatch } from './types'
 
 // Deliberately isolated fixtures: these are never seeded into the application.
 const { apiMock, postMock } = vi.hoisted(() => ({ apiMock: vi.fn(), postMock: vi.fn() }))
-vi.mock('./api/client', () => ({ api: apiMock, post: postMock }))
+vi.mock('./api', () => ({ api: apiMock, post: postMock }))
 
 const fixtureFilter: CatalogFilter = {
   id: 'fixture-skill', category_id: 'fixture-category', label: 'Fixture skill',

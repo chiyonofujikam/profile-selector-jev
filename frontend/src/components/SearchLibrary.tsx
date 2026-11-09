@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api, post } from '../api/client'
-import type { Analysis, Page, SavedSearch } from '../api/types'
-import { errorMessage } from '../hooks/useSearch'
-import type { SearchState } from '../hooks/useSearch'
+import { api, post } from '../api'
+import type { Analysis, Page, SavedSearch } from '../types'
+import { errorMessage } from '../messages'
+import type { SearchState } from '../useSearch'
 import { Modal } from './Modal'
 import { Pagination } from './Pagination'
 
@@ -70,7 +70,7 @@ export function SearchLibrary({ view, search, onClose }: {
         <button className="primary" disabled={saving || !name.trim()}>{saving ? 'Saving…' : 'Save search'}</button></div>
     </form> : loading ? <p role="status">Loading…</p> : <>
       {!items.length && !error && <p className="empty-state">{view === 'saved' ? 'No saved searches yet.' : 'No analyses yet.'}</p>}
-      <div className="saved-list">{items.map(item => <div className="saved-item" key={item.id}>
+      <div>{items.map(item => <div className="saved-item" key={item.id}>
         <button onClick={() => { search.restore(item); onClose() }}>
           <strong>{'label' in item ? item.label : item.state_text}</strong>
           <small>{item.filters.length} filters · {new Date(item.created_at).toLocaleString()}</small>

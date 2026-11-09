@@ -1,4 +1,4 @@
-import type { CatalogFilter, Constraint } from '../api/types'
+import type { CatalogFilter, Constraint } from '../types'
 
 type Props = {
   filter: CatalogFilter
@@ -10,6 +10,9 @@ export function FilterRow({ filter, active, update }: Props) {
   const level = filter.levels.find(item => item.id === active?.level_id)
   const exact = level?.supports_exact !== false
   const minimum = level?.rank != null && level.supports_minimum !== false
+  let sourceLabel = 'Demo'
+  if (active?.source === 'jev') sourceLabel = 'Decision model'
+  if (active?.source === 'manual') sourceLabel = 'Manual'
 
   function changeLevel(id: string) {
     const next = filter.levels.find(item => item.id === id)
@@ -24,7 +27,7 @@ export function FilterRow({ filter, active, update }: Props) {
     <th scope="row">
       <label className="filter-description" htmlFor={`filter-${filter.id}`}>
         <span className="filter-label">{filter.label}
-          {active && <span className="source-label">{active.source === 'jev' ? 'Decision model' : active.source === 'manual' ? 'Manual' : 'Demo'}</span>}
+          {active && <span className="source-label">{sourceLabel}</span>}
         </span>
         <span>{filter.description}</span>
         {filter.subcategory && <small>{filter.subcategory}</small>}

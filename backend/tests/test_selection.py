@@ -4,10 +4,10 @@ import math
 
 import pytest
 
-from backend.app.services import decisions
-from backend.app.services.decisions import ProviderError, analyze, apply_policy, build_questions, sanitize, validate_response
-from backend.app.services.matching import search_profiles, validate_constraints
-from backend.app.services.retrieval import normalize, retrieve
+from backend.app import selection
+from backend.app.selection import ProviderError, analyze, apply_policy, build_questions, sanitize, validate_response
+from backend.app.matching import search_profiles, validate_constraints
+from backend.app.filter_search import normalize, retrieve
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def test_mock_does_not_fabricate_calibrated_probabilities(catalog):
 
 @pytest.mark.parametrize("state", ["", "  ", "\n"])
 def test_blank_state_never_calls_provider(state, monkeypatch):
-    monkeypatch.setattr(decisions, "_call_jev", lambda *_args, **_kwargs: pytest.fail("provider called"))
+    monkeypatch.setattr(selection, "call_jev", lambda *_args, **_kwargs: pytest.fail("provider called"))
     with pytest.raises(ValueError, match="blank"):
         analyze(state, [], [], provider="jev")
 
@@ -94,7 +94,7 @@ def test_no_tool_level_inferred_from_experience(catalog):
 
 @pytest.mark.parametrize("value,expected", [(.7, "selected"), (.3, "rejected"), (.5, "uncertain")])
 def test_threshold_boundaries(value, expected):
-    assert decisions._status(value, .7, .3) == expected
+    assert selection._status(value, .7, .3) == expected
 
 
 @pytest.mark.parametrize("value", [math.nan, math.inf, -.1, 1.1, True, "0.8", None])
@@ -146,7 +146,7 @@ def test_category_limits_preserve_dropped_decisions(catalog):
 def test_live_failure_does_not_fall_back(catalog, monkeypatch):
     def fail(*_args, **_kwargs):
         raise ProviderError("provider_timeout", "Test timeout", 504)
-    monkeypatch.setattr(decisions, "_call_jev", fail)
+    monkeypatch.setattr(selection, "call_jev", fail)
     with pytest.raises(ProviderError) as error:
         analyze("C++", catalog, [], provider="jev", api_key="fixture")
     assert error.value.code == "provider_timeout"

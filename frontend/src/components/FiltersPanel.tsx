@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api/client'
-import type { CatalogFilter, Category, Page } from '../api/types'
-import { errorMessage } from '../hooks/useSearch'
-import type { SearchState } from '../hooks/useSearch'
+import { api } from '../api'
+import type { CatalogFilter, Category, Page } from '../types'
+import { errorMessage } from '../messages'
+import type { SearchState } from '../useSearch'
 import { FilterRow } from './FilterRow'
 import { Pagination } from './Pagination'
 
@@ -18,6 +18,17 @@ export function FiltersPanel({ search }: { search: SearchState }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
+
+  function rememberFilters(items: CatalogFilter[], missingIds: string[] = []) {
+    setCache(current => {
+      const next = { ...current }
+      for (const id of missingIds) {
+        if (!(id in next)) next[id] = null
+      }
+      for (const item of items) next[item.id] = item
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!open) return
@@ -40,7 +51,7 @@ export function FiltersPanel({ search }: { search: SearchState }) {
         const data = await api<Page<CatalogFilter>>(`/api/v1/filters?${params}`, { signal: controller.signal })
         if (controller.signal.aborted) return
         setCatalog(data)
-        setCache(current => ({ ...current, ...Object.fromEntries(data.items.map(item => [item.id, item])) }))
+        rememberFilters(data.items)
         setError('')
       } catch (error) {
         if (!controller.signal.aborted) setError(errorMessage(error))
@@ -67,10 +78,7 @@ export function FiltersPanel({ search }: { search: SearchState }) {
         }
         if (!controller.signal.aborted) {
           // Remember unavailable IDs too, so old saved filters cannot cause a fetch loop.
-          setCache(current => ({
-            ...Object.fromEntries(missing.map(id => [id, null])), ...current,
-            ...Object.fromEntries(items.map(item => [item.id, item])),
-          }))
+          rememberFilters(items, missing)
         }
       } catch (error) {
         if (!controller.signal.aborted) setError(errorMessage(error))
@@ -80,11 +88,18 @@ export function FiltersPanel({ search }: { search: SearchState }) {
     return () => controller.abort()
   }, [open, search.filters, cache, reload])
 
-  const shown = selectedOnly ? Object.values(cache).filter((item): item is CatalogFilter => item !== null).filter(item =>
-    search.filters.some(filter => filter.filter_id === item.id)
-    && (!category || item.category_id === category)
-    && [item.label, item.description, ...item.aliases].join(' ').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
-  ) : catalog?.items || []
+  let shown = catalog?.items || []
+  if (selectedOnly) {
+    shown = []
+    for (const item of Object.values(cache)) {
+      if (!item) continue
+      const selected = search.filters.some(filter => filter.filter_id === item.id)
+      const matchesCategory = !category || item.category_id === category
+      const text = [item.label, item.description, ...item.aliases].join(' ').toLocaleLowerCase()
+      const matchesQuery = text.includes(query.trim().toLocaleLowerCase())
+      if (selected && matchesCategory && matchesQuery) shown.push(item)
+    }
+  }
 
   return <section className="panel" aria-labelledby="filters-title">
     <div className="section-heading filter-heading">
@@ -125,9 +140,9 @@ export function FiltersPanel({ search }: { search: SearchState }) {
     {search.filters.some(filter => cache[filter.filter_id] === null) && <div className="notice warning">
       <p>Some selected filters are no longer available. Remove them below to continue searching.</p>
       {search.filters.filter(filter => cache[filter.filter_id] === null).map(filter => <button className="filter-chip" key={filter.filter_id}
-        aria-label={`Remove ${cache[filter.filter_id]?.label || filter.filter_id}`}
+        aria-label={`Remove ${filter.filter_id}`}
         onClick={() => search.updateFilter(filter.filter_id, null)}>
-        {filter.mode === 'exclude' && 'Exclude: '}{cache[filter.filter_id]?.label || filter.filter_id} ×
+        {filter.mode === 'exclude' && 'Exclude: '}{filter.filter_id} ×
       </button>)}
     </div>}
     {loading ? <p className="empty-state" role="status">Loading filters…</p>

@@ -1,4 +1,4 @@
-"""Idempotent analysis orchestration and persistence."""
+"""Run a filter analysis and save its result in PostgreSQL."""
 
 import hashlib
 import json
@@ -11,12 +11,12 @@ from fastapi import HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import Settings
-from backend.app.db import models as db
-from backend.app.db.catalog import catalog
-from backend.app.schemas import AnalysisRequest, AnalysisResponse
-from . import decisions
-from .decisions import POLICY_VERSION
+from .config import Settings
+from . import models
+from .catalog import load_catalog
+from .schemas import AnalysisRequest, AnalysisResponse
+from . import selection
+from .selection import POLICY_VERSION
 from .matching import validate_constraints
 
 
@@ -25,21 +25,21 @@ def create_analysis(payload: AnalysisRequest, session: Session, settings: Settin
     request_data = payload.model_dump(exclude={"request_id"})
     request_hash = hashlib.sha256(json.dumps(request_data, sort_keys=True).encode()).hexdigest()
 
-    # Serialize retries across workers. Return a stored response before calling Jev.
+    # Reuse a completed request so clicking Retry cannot pay for the same call twice.
     session.execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
         {"key": request_id},
     )
-    existing = session.scalar(select(db.Analysis).where(db.Analysis.request_id == request_id))
+    existing = session.scalar(select(models.Analysis).where(models.Analysis.request_id == request_id))
     if existing:
         if existing.request_hash != request_hash:
             raise HTTPException(409, "This request ID was already used for different state or filters")
         return existing.result
 
     # Selection uses plain dictionaries; it does not depend on the database session.
-    items = catalog(session)
+    items = load_catalog(session)
     start = perf_counter()
-    result = decisions.analyze(
+    result = selection.analyze(
         payload.state_text, items, request_data["current_filters"],
         provider=settings.decision_provider,
         model=settings.jev_model,
@@ -65,7 +65,7 @@ def create_analysis(payload: AnalysisRequest, session: Session, settings: Settin
     response_data = response.model_dump(mode="json")
 
     # Store the analysis, every decision, and the complete response in one transaction.
-    session.add(db.Analysis(
+    session.add(models.Analysis(
         id=response.id, request_id=request_id, request_hash=request_hash,
         state_text=payload.state_text, client_revision=payload.client_revision,
         submitted_filters=request_data["current_filters"], provider=response.provider,
@@ -75,12 +75,12 @@ def create_analysis(payload: AnalysisRequest, session: Session, settings: Settin
     ))
     session.flush()
     for decision in response_data["decisions"]:
-        session.add(db.AnalysisDecision(
+        session.add(models.AnalysisDecision(
             analysis_id=response.id, question_id=decision["question_id"],
             filter_id=decision["filter_id"], primitive=decision["primitive"],
             status=decision["status"], payload=decision,
         ))
-    session.add(db.ProviderResponse(
+    session.add(models.ProviderResponse(
         analysis_id=response.id, request=request_data,
         response=response_data["provider_response"], usage=response_data["usage"],
     ))

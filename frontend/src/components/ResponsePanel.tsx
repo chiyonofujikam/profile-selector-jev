@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { Analysis, Decision } from '../api/types'
-import { modelText } from '../modelText'
+import type { Analysis, Decision } from '../types'
+import { modelText } from '../messages'
 
 const percent = (value: number | null | undefined) =>
   value == null ? 'Unavailable' : `${(value * 100).toFixed(1)}%`

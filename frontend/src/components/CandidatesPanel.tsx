@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { post } from '../api/client'
-import type { Page, ProfileMatch } from '../api/types'
-import { errorMessage } from '../hooks/useSearch'
-import type { SearchState } from '../hooks/useSearch'
+import { post } from '../api'
+import type { Page, ProfileMatch } from '../types'
+import { errorMessage } from '../messages'
+import type { SearchState } from '../useSearch'
 import { Modal } from './Modal'
 import { Pagination } from './Pagination'
 

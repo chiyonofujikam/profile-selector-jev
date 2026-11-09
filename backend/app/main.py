@@ -1,3 +1,5 @@
+"""Start FastAPI, connect the routes, and report errors and service health."""
+
 import logging
 from uuid import uuid4
 
@@ -9,11 +11,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
-from backend.app.api.routes import router
-from backend.app.core.config import get_settings
-from backend.app.db.session import engine
-from backend.app.services.decisions import ProviderError
-from backend.app.schemas import HealthResponse
+from .routes import router
+from .config import get_settings
+from .database import engine
+from .selection import ProviderError
+from .schemas import HealthResponse
 
 settings = get_settings()
 app = FastAPI(title="Jev Smart Filter Selector", version="0.1.0")
@@ -26,7 +28,11 @@ logger = logging.getLogger("jev.api")
 @app.middleware("http")
 async def request_id(request: Request, call_next):
     candidate = request.headers.get("X-Request-ID", "")
-    request.state.request_id = candidate if len(candidate) <= 160 and candidate.isascii() and candidate.isprintable() and candidate else str(uuid4())
+    valid_id = candidate and len(candidate) <= 160 and candidate.isascii() and candidate.isprintable()
+    if valid_id:
+        request.state.request_id = candidate
+    else:
+        request.state.request_id = str(uuid4())
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
     return response
@@ -79,10 +85,27 @@ def health():
             schema_ready = bool(has_schema and connection.scalar(text("SELECT version_num FROM alembic_version")) == "5be32c366157")
     except SQLAlchemyError:
         pass
-    return {"status": "ok" if database_ready and schema_ready and settings.provider_ready else "degraded",
-            "database": {"ready": database_ready and schema_ready, "reachable": database_ready, "migrated": schema_ready},
-            "provider": {"name": settings.decision_provider, "ready": settings.provider_ready,
-                         "live_verified": False if settings.decision_provider == "jev" else None}}
+    status = "degraded"
+    if database_ready and schema_ready and settings.provider_ready:
+        status = "ok"
+
+    live_verified = None
+    if settings.decision_provider == "jev":
+        live_verified = False
+
+    return {
+        "status": status,
+        "database": {
+            "ready": database_ready and schema_ready,
+            "reachable": database_ready,
+            "migrated": schema_ready,
+        },
+        "provider": {
+            "name": settings.decision_provider,
+            "ready": settings.provider_ready,
+            "live_verified": live_verified,
+        },
+    }
 
 
 @app.exception_handler(Exception)

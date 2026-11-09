@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Analysis, CatalogFilter, Constraint, SavedSearch } from '../src/api/types'
+import type { Analysis, CatalogFilter, Constraint, SavedSearch } from '../src/types'
 
 // Isolated browser fixtures. No product database or live Jev request is used.
 const filter: CatalogFilter = {

@@ -1,4 +1,4 @@
-"""Selection pipeline: retrieve → build questions → call provider → apply policy."""
+"""Turn the user's text into selected filters: find, ask, then apply the answers."""
 
 from __future__ import annotations
 
@@ -6,21 +6,25 @@ import math
 from collections import Counter
 
 from .matching import validate_constraints
-from .retrieval import retrieve
-from .jev import ProviderError, _call_jev, sanitize
-from .mock import _mock
+from .filter_search import retrieve
+from .jev import ProviderError, call_jev, sanitize
+from .demo import analyze_demo
 
 POLICY_VERSION = "selection-v1"
 
 
 def _question(item: dict, kind: str) -> dict:
-    category = item.get("category_label") or item["category_id"]
-    definition = f"Filter: {item['label']}. Definition: {item.get('description', '')}. Category: {category}. Subcategory/context: {item.get('subcategory') or 'unspecified'}."
+    definition = f"Filter: {item['label']}. Definition: {item.get('description', '')}. Category: {item['category_id']}. Subcategory/context: {item.get('subcategory') or 'unspecified'}."
     if item.get("levels"):
-        definition += " Allowed levels and operators: " + "; ".join(
-            f"{level['label']} [id={level['id']}, dimension={level.get('dimension')}, exact={level.get('supports_exact', True)}, minimum={level.get('supports_minimum', True) and level.get('rank') is not None}]"
-            for level in item["levels"]
-        ) + "."
+        descriptions = []
+        for level in item["levels"]:
+            exact = level.get("supports_exact", True)
+            minimum = level.get("supports_minimum", True) and level.get("rank") is not None
+            descriptions.append(
+                f"{level['label']} [id={level['id']}, dimension={level.get('dimension')}, "
+                f"exact={exact}, minimum={minimum}]"
+            )
+        definition += " Allowed levels and operators: " + "; ".join(descriptions) + "."
     instructions = {
         "relevance": "Does the user's requirement positively ask for this specific filter? Excluded filters are not positive requirements. Do not infer related specialties from taxonomy membership or infer relevance from the existing filter snapshot.",
         "exclusion": "Does the user's requirement explicitly exclude this specific filter? Lack of a mention is not an exclusion.",
@@ -51,13 +55,12 @@ def build_questions(candidates: list[dict]) -> tuple[dict, dict]:
     return questions, mapping
 
 
-def _probability(value, label: str) -> float:
+def _validate_probability(value, label: str) -> None:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
         raise ProviderError("invalid_provider_response", f"Provider returned an invalid {label}.")
-    return float(value)
 
 
-def validate_response(response: dict, questions: dict) -> dict:
+def validate_response(response: dict, questions: dict) -> None:
     """Reject missing/unexpected IDs, invalid numeric ranges, and partial distributions."""
     if not isinstance(response, dict) or not isinstance(response.get("answers"), dict):
         raise ProviderError("invalid_provider_response", "Provider response has no answer mapping.")
@@ -69,13 +72,13 @@ def validate_response(response: dict, questions: dict) -> dict:
         if not isinstance(answer, dict) or answer.get("type") != question["type"]:
             raise ProviderError("invalid_provider_response", "Provider answer primitive does not match its question.")
         if question["type"] == "noul":
-            _probability(answer.get("noul"), "Noul probability")
+            _validate_probability(answer.get("noul"), "Noul probability")
         else:
             probabilities = answer.get("probabilities")
             if not isinstance(probabilities, dict) or set(probabilities) != set(question["criteria"]):
                 raise ProviderError("invalid_provider_response", "Provider omitted or invented a Choice option probability.")
             for value in probabilities.values():
-                _probability(value, "option probability")
+                _validate_probability(value, "option probability")
             if not math.isclose(sum(probabilities.values()), 1.0, abs_tol=0.02):
                 raise ProviderError("invalid_provider_response", "Provider option probabilities do not sum to one.")
             selected = answer.get("choice")
@@ -83,37 +86,74 @@ def validate_response(response: dict, questions: dict) -> dict:
                 raise ProviderError("invalid_provider_response", "Provider selected an unsupported Choice option.")
             if probabilities[selected] + 1e-6 < max(probabilities.values()):
                 raise ProviderError("invalid_provider_response", "Provider selected a Choice that does not have the highest probability.")
-            _probability(answer.get("confidence"), "Choice confidence")
-    return response
+            _validate_probability(answer.get("confidence"), "Choice confidence")
 
 
 def _status(probability: float, yes: float, no: float) -> str:
-    return "selected" if probability >= yes else "rejected" if probability <= no else "uncertain"
+    if probability >= yes:
+        return "selected"
+    if probability <= no:
+        return "rejected"
+    return "uncertain"
+
+
+def make_decision(question_id, question, answer, item, kind, select_threshold, reject_threshold):
+    """Prepare one answer for the response panel."""
+    probability = None
+    confidence = None
+    if answer["type"] == "noul":
+        probability = answer["noul"]
+        selected_value = str(probability)
+        status = _status(probability, select_threshold, reject_threshold)
+    else:
+        confidence = answer["confidence"]
+        selected_value = answer["choice"]
+        status = _status(confidence, select_threshold, reject_threshold)
+        if selected_value in {"unspecified", "unsupported"}:
+            status = selected_value
+
+    if kind == "operator":
+        kind = "level"
+    threshold = select_threshold
+    if status == "rejected":
+        threshold = reject_threshold
+
+    return {
+        "question_id": question_id,
+        "filter_id": item["id"],
+        "filter_label": item["label"],
+        "question": question["instructions"],
+        "primitive": answer["type"],
+        "kind": kind,
+        "status": status,
+        "probability": probability,
+        "confidence": confidence,
+        "probabilities": answer.get("probabilities"),
+        "selected_value": selected_value,
+        "provenance": "jev",
+        "threshold": threshold,
+    }
 
 
 def apply_policy(response: dict, questions: dict, mapping: dict, *, select_threshold=.7, reject_threshold=.3, max_filters_per_category=10) -> dict:
     validate_response(response, questions)
-    decisions, grouped = [], {}
+    decisions = []
+    grouped = {}
     for question_id, answer in response["answers"].items():
         meta = mapping[question_id]
-        item, kind = meta["filter"], meta["kind"]
-        noul = answer["type"] == "noul"
-        probability = answer.get("noul") if noul else None
-        confidence = None if noul else answer["confidence"]
-        status = _status(probability if noul else confidence, select_threshold, reject_threshold)
-        if not noul and answer["choice"] in {"unspecified", "unsupported"}:
-            status = "unspecified" if answer["choice"] == "unspecified" else "unsupported"
-        decision = {"question_id": question_id, "filter_id": item["id"], "filter_label": item["label"],
-                    "question": questions[question_id]["instructions"], "primitive": answer["type"],
-                    "kind": "level" if kind == "operator" else kind, "status": status,
-                    "probability": probability, "confidence": confidence,
-                    "probabilities": answer.get("probabilities"), "selected_value": str(answer["noul"]) if noul else answer["choice"],
-                    "provenance": "jev", "threshold": reject_threshold if status == "rejected" else select_threshold}
+        item = meta["filter"]
+        kind = meta["kind"]
+        decision = make_decision(
+            question_id, questions[question_id], answer, item, kind,
+            select_threshold, reject_threshold,
+        )
         decisions.append(decision)
         grouped.setdefault(item["id"], {"item": item})[kind] = decision
     selected, category_counts = [], Counter()
     for filter_id, group in grouped.items():
-        relevant, excluded, mandatory = (group[key] for key in ("relevance", "exclusion", "mandatory"))
+        relevant = group["relevance"]
+        excluded = group["exclusion"]
+        mandatory = group["mandatory"]
         if relevant["status"] == "selected" and excluded["status"] == "selected":
             relevant["status"] = excluded["status"] = "conflict"
             continue
@@ -138,7 +178,10 @@ def apply_policy(response: dict, questions: dict, mapping: dict, *, select_thres
                     continue
                 level_id, operator = level["selected_value"], comparison["selected_value"]
                 definition = next(level for level in group["item"]["levels"] if level["id"] == level_id)
-                supported = (definition.get("rank") is not None and definition.get("supports_minimum", True)) if operator == "minimum" else definition.get("supports_exact", True)
+                if operator == "minimum":
+                    supported = definition.get("rank") is not None and definition.get("supports_minimum", True)
+                else:
+                    supported = definition.get("supports_exact", True)
                 if not supported:
                     level["status"] = "unsupported"
                     relevant["status"] = "uncertain"
@@ -149,14 +192,22 @@ def apply_policy(response: dict, questions: dict, mapping: dict, *, select_thres
             continue
         if mode == "include":
             category_counts[category_id] += 1
-        selected.append({"filter_id": filter_id, "mode": mode, "requirement": "mandatory" if mode == "exclude" or mandatory["status"] == "selected" else "preferred",
-                         "level_id": level_id, "operator": operator, "source": "jev"})
+        requirement = "preferred"
+        if mode == "exclude" or mandatory["status"] == "selected":
+            requirement = "mandatory"
+        selected.append({
+            "filter_id": filter_id,
+            "mode": mode,
+            "requirement": requirement,
+            "level_id": level_id,
+            "operator": operator,
+            "source": "jev",
+        })
     sanitized = sanitize(response)
     sanitized["selection_policy"] = {"select_threshold": select_threshold, "reject_threshold": reject_threshold,
                                      "uncertain_interval": [reject_threshold, select_threshold]}
     return {"filters": selected, "decisions": decisions, "provider_response": sanitized,
             "usage": response.get("usage") or {}, "model": response.get("model")}
-
 
 
 def analyze(
@@ -177,12 +228,12 @@ def analyze(
     candidates = retrieve(state_text, catalog, current_filters, candidate_budget)
     questions, mapping = build_questions(candidates)
     if provider == "mock":
-        return _mock(state_text, candidates, questions, mapping, max_filters_per_category)
+        return analyze_demo(state_text, candidates, questions, mapping, max_filters_per_category)
     # Empty catalogs cannot produce typed questions; do not pretend a provider call ran.
     if not questions:
         raise ProviderError("no_candidate_filters", "No catalog filters match this state. Import a reviewed catalog or adjust the requirement.", 422)
     state = {"user_requirement": state_text, "current_filter_snapshot": current_filters,
              "snapshot_context": "Existing selections are UI context only, not evidence of the user's new requirement. Reevaluate them from user_requirement."}
-    response = _call_jev(state, questions, api_key=api_key, model=model, timeout_seconds=timeout_seconds, max_retries=max_retries)
+    response = call_jev(state, questions, api_key=api_key, model=model, timeout_seconds=timeout_seconds, max_retries=max_retries)
     return apply_policy(response, questions, mapping, select_threshold=select_threshold, reject_threshold=reject_threshold,
                         max_filters_per_category=max_filters_per_category)

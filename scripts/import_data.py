@@ -128,7 +128,7 @@ def import_payload(session: Any, payload: ImportPayload) -> dict[str, int]:
     """Upsert without committing; the caller owns the single atomic transaction."""
     from sqlalchemy import and_, delete, select
 
-    from backend.app.db.models import (
+    from backend.app.models import (
         Category, Example, Filter, FilterAlias, FilterLevel, Level, Profile,
         ProfileCompetency, ProfileLanguage,
     )
@@ -218,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         from sqlalchemy.exc import SQLAlchemyError
 
-        from backend.app.db.session import SessionLocal
+        from backend.app.database import SessionLocal
 
         try:
             with SessionLocal() as session:

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { api } from './api/client'
-import type { Config, Health } from './api/types'
+import { api } from './api'
+import type { Config, Health } from './types'
 import { CandidatesPanel } from './components/CandidatesPanel'
 import { FiltersPanel } from './components/FiltersPanel'
 import { ResponsePanel } from './components/ResponsePanel'
 import { SearchLibrary } from './components/SearchLibrary'
 import type { LibraryView } from './components/SearchLibrary'
-import { errorMessage, useSearch } from './hooks/useSearch'
+import { useSearch } from './useSearch'
+import { errorMessage } from './messages'
 
 export default function App() {
   const search = useSearch()
@@ -33,7 +34,7 @@ export default function App() {
   }, [reload])
 
   const maxLength = config?.max_state_length || 12000
-  return <div className="app-shell">
+  return <div>
     <header className="app-header">
       <a className="brand" href="#main">Decision model<span> / profile selector</span></a>
       <nav aria-label="Search tools">
